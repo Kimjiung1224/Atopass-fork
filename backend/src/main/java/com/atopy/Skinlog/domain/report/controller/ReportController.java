@@ -1,11 +1,14 @@
 package com.atopy.Skinlog.domain.report.controller;
 
 import com.atopy.Skinlog.domain.report.dto.request.ReportCreateRequest;
+import com.atopy.Skinlog.domain.report.dto.response.ReportPageResponse;
 import com.atopy.Skinlog.domain.report.dto.response.ReportResponse;
 import com.atopy.Skinlog.domain.report.service.ReportService;
 import com.atopy.Skinlog.global.response.ApiResponse;
 import com.atopy.Skinlog.global.security.CurrentMember;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -13,20 +16,37 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 보고서 목록·상세 조회(GET /reports, GET /reports/{reportId})는 별도 작업에서 이 컨트롤러에 추가한다. */
+@Validated
 @RestController
 @RequestMapping("/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
 	private final ReportService reportService;
+
+	@GetMapping
+	public ApiResponse<ReportPageResponse> list(
+		@CurrentMember Long memberId,
+		@RequestParam(defaultValue = "0") @Min(value = 0, message = "page는 0 이상이어야 합니다.") int page,
+		@RequestParam(defaultValue = "10")
+		@Min(value = 1, message = "size는 1 이상이어야 합니다.")
+		@Max(value = 100, message = "size는 100 이하여야 합니다.") int size) {
+		return ApiResponse.ok(reportService.list(memberId, page, size));
+	}
+
+	@GetMapping("/{reportId}")
+	public ApiResponse<ReportResponse> get(@CurrentMember Long memberId, @PathVariable Long reportId) {
+		return ApiResponse.ok(reportService.get(memberId, reportId));
+	}
 
 	@PostMapping
 	public ResponseEntity<ApiResponse<ReportResponse>> create(
