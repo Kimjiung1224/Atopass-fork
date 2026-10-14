@@ -22,3 +22,5 @@ app:
     cookie-secure: true
   cors:
     allowed-origins: http://localhost:5173
+  storage:
+    report-dir: build/test-storage/reports

@@ -31,3 +31,6 @@ app:
     effort: ${LLM_EFFORT:low}
     max-tokens: 2048
     timeout-seconds: 30
+  storage:
+    # 보고서 PDF 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
+    report-dir: ${REPORT_DIR:./data/reports}
