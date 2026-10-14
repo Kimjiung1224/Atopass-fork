@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### 생성된 파일(보고서 PDF 등) ###
+data/
