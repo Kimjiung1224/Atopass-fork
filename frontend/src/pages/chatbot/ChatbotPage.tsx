@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ChatInput from '@/components/chatbot/ChatInput';
+import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
+import PendingFieldList from '@/components/chatbot/PendingFieldList';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
@@ -14,12 +16,18 @@ import { recordPath } from '@/utils/routes';
 export default function ChatbotPage() {
   const navigate = useNavigate();
   const recordDate = today();
-  const { messages, requiresConfirmation, status, error, send, retry } = useChatSession(recordDate);
+  const { messages, pendingFields, requiresConfirmation, status, error, send, agree, retry } =
+    useChatSession(recordDate);
   const draft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   const goToSummary = () => navigate(recordPath(recordDate));
+
+  // 이 날짜의 대화가 이미 기록으로 저장됐으면 총정리(수정)로 보낸다
+  useEffect(() => {
+    if (status === 'closed') navigate(recordPath(recordDate), { replace: true });
+  }, [status, navigate, recordDate]);
 
   const handleSubmit = async (text: string) => {
     setInput('');
@@ -56,6 +64,8 @@ export default function ChatbotPage() {
         )}
       </div>
 
+      {!requiresConfirmation && <PendingFieldList fields={pendingFields} />}
+
       {requiresConfirmation && (
         <div className="border-t border-emerald-100 bg-emerald-50 p-3">
           <button
@@ -75,7 +85,7 @@ export default function ChatbotPage() {
         </div>
       )}
 
-      {status !== 'error' && status !== 'loading' && error && (
+      {(status === 'ready' || status === 'sending') && error && (
         <p role="alert" className="px-4 pt-2 text-sm text-red-500">
           {error}
         </p>
@@ -88,6 +98,8 @@ export default function ChatbotPage() {
         onAttachPhotos={handleAttach}
         disabled={status !== 'ready'}
       />
+
+      {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}
     </div>
   );
 }
