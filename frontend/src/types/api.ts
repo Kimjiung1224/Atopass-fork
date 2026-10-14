@@ -42,6 +42,7 @@ export type ErrorCode =
   | 'SESSION_CLOSED'
   | 'CHATBOT_UNAVAILABLE'
   | 'DRAFT_NOT_CONFIRMED'
+  | 'CONSENT_REQUIRED'
   // 보고서
   | 'REPORT_NOT_FOUND'
   | 'NO_RECORDS_IN_PERIOD';
