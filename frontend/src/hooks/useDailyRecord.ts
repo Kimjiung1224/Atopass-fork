@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
+import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
 import { recordApi } from '@/apis/record';
 import type { PhotoRef, RecordInput } from '@/types/record';
@@ -7,7 +8,7 @@ import { chatSessionStore } from './useRecordDraft';
 
 /**
  * - edit: 이미 저장된 기록 → PUT /records/{id}
- * - chatDraft: 챗봇 세션에서 넘어온 초안 → POST /chatbot/sessions/{id}/records (confirmed: true)
+ * - chatDraft: 챗봇 세션의 초안(GET /chatbot/sessions/{id}/draft)으로 채움 → POST /chatbot/sessions/{id}/records (confirmed: true)
  * - new: 기록도 세션도 없음 → 직접 입력, POST /records
  */
 export type DailyRecordMode = 'edit' | 'chatDraft' | 'new';
@@ -19,6 +20,27 @@ const emptyRecord = (recordDate: string): RecordInput => ({
   lifestyle: null,
   notes: null,
 });
+
+/**
+ * 챗봇 세션의 초안을 폼 값으로 가져온다.
+ * - 'closed': 이미 저장된 세션(409 SESSION_CLOSED) → GET /records로 조회해야 함
+ * - null: 세션이 없거나 만료됨(SESSION_NOT_FOUND) → 직접 입력
+ */
+async function loadChatDraft(sessionId: string) {
+  return chatbotApi
+    .getDraft(sessionId)
+    .then(({ draft }) => ({
+      skinConditions: draft.skinConditions ?? [],
+      sleepHours: draft.sleepHours ?? null,
+      lifestyle: draft.lifestyle ?? null,
+      notes: draft.notes ?? null,
+    }))
+    .catch((e: unknown) => {
+      if (e instanceof ApiError && e.code === 'SESSION_CLOSED') return 'closed' as const;
+      if (e instanceof ApiError && e.code === 'SESSION_NOT_FOUND') return null;
+      throw e;
+    });
+}
 
 export function useDailyRecord(recordDate: string) {
   const [mode, setMode] = useState<DailyRecordMode>('new');
@@ -45,12 +67,19 @@ export function useDailyRecord(recordDate: string) {
 
       setRecordId(null);
       setPhotos([]);
-      if (chatSessionStore.get(recordDate)) {
+      const sessionId = chatSessionStore.get(recordDate);
+      const draft = sessionId ? await loadChatDraft(sessionId) : null;
+      if (draft === 'closed') {
+        // 세션은 이미 기록으로 저장됨 → 저장된 기록을 다시 조회한다
+        chatSessionStore.clear(recordDate);
+        await load();
+        return;
+      }
+      if (draft) {
         setMode('chatDraft');
-        // TODO: 챗봇이 정리한 초안을 받아오는 API가 명세에 없음 — 백엔드와 협의 필요.
-        //   (예: GET /chatbot/sessions/{sessionId}/draft) 확정되면 여기서 form을 채운다.
-        setForm(emptyRecord(recordDate));
+        setForm({ recordDate, ...draft });
       } else {
+        if (sessionId) chatSessionStore.clear(recordDate);
         setMode('new');
         setForm(emptyRecord(recordDate));
       }
