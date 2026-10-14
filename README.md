@@ -48,6 +48,7 @@ CREATE DATABASE skinlog CHARACTER SET utf8mb4;
 | `COOKIE_SECURE` | | `true` | 리프레시 토큰 쿠키의 `Secure` 속성. Safari로 `http://localhost`에서 개발할 때만 `false` |
 | `CORS_ALLOWED_ORIGINS` | | `http://localhost:5173` | 허용할 프론트 주소 |
 | `REPORT_DIR` | | `./data/reports` | 보고서 PDF 저장 폴더. 웹으로 공개되는 경로 밖이어야 합니다. |
+| `PHOTO_DIR` | | `./data/photos` | 기록 사진 저장 폴더. 웹으로 공개되는 경로 밖이어야 합니다. |
 | `JPA_DDL_AUTO` | | `update` | 테이블 자동 생성·변경 방식 |
 
 ### 3. 백엔드
