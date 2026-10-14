@@ -86,12 +86,32 @@ public class ChatSessionService {
 
 	/** LLM 응답을 받은 뒤 사용자 메시지와 챗봇 응답, 초안을 한 번에 저장한다. */
 	@Transactional
-	public void saveTurn(String sessionId, String userText, String assistantText, String draftJson, int failCount) {
+	public void saveTurn(String sessionId, String userText, String assistantText, String draftJson,
+		int failCount, boolean confirmationReady) {
 		ChatSession session = sessionRepository.findById(sessionId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 		messageRepository.save(ChatMessage.of(session, ChatRole.USER, userText));
 		messageRepository.save(ChatMessage.of(session, ChatRole.ASSISTANT, assistantText));
-		session.updateTurn(draftJson, failCount);
+		session.updateTurn(draftJson, failCount, confirmationReady);
+	}
+
+	/** 새로고침 뒤 초안을 다시 채우기 위한 세션의 현재 초안 상태 */
+	record DraftState(String draftJson, boolean confirmationReady) {
+	}
+
+	/**
+	 * 초안 상태를 조회한다. 기록을 저장해 닫힌 세션이면 초안이 더는 의미가 없으므로 SESSION_CLOSED,
+	 * 질의 모드 세션에는 초안이 없으므로 INVALID_INPUT으로 처리한다.
+	 */
+	public DraftState draftState(Long memberId, String sessionId) {
+		ChatSession session = findOwned(memberId, sessionId);
+		if (session.isClosed()) {
+			throw new BusinessException(ErrorCode.SESSION_CLOSED);
+		}
+		if (session.getMode() != ChatMode.RECORD) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "질의 모드 대화에는 기록 초안이 없습니다.");
+		}
+		return new DraftState(session.getDraft(), session.isConfirmationReady());
 	}
 
 	public List<ChatMessage> messages(Long memberId, String sessionId) {

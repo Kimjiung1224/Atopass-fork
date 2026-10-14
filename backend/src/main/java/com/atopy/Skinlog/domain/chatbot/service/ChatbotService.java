@@ -1,6 +1,7 @@
 package com.atopy.Skinlog.domain.chatbot.service;
 
 import com.atopy.Skinlog.domain.chatbot.dto.request.ChatRecordSaveRequest;
+import com.atopy.Skinlog.domain.chatbot.dto.response.ChatDraftStateResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatMessagesResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatReplyResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatSessionResponse;
@@ -73,8 +74,15 @@ public class ChatbotService {
 			: queryOutcome(context, raw);
 
 		sessionService.saveTurn(sessionId, userText, outcome.response().reply(),
-			outcome.draftJson(), outcome.failCount());
+			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation());
 		return outcome.response();
+	}
+
+	/** 세션에 쌓인 초안과 진행 상태. 마지막 메시지 응답의 draft·pendingFields·requiresConfirmation과 같은 값이다. */
+	public ChatDraftStateResponse draft(Long memberId, String sessionId) {
+		ChatSessionService.DraftState state = sessionService.draftState(memberId, sessionId);
+		ChatDraft draft = ChatDraft.fromJson(jsonMapper, state.draftJson());
+		return new ChatDraftStateResponse(draft.toResponse(), draft.pendingFields(), state.confirmationReady());
 	}
 
 	/** 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다. */
