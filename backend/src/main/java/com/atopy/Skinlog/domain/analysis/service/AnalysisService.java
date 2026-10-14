@@ -1,10 +1,15 @@
 package com.atopy.Skinlog.domain.analysis.service;
 
 import com.atopy.Skinlog.domain.analysis.dto.response.AnalysisSummaryResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.ComparisonResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.ComparisonResponse.ComparisonSide;
 import com.atopy.Skinlog.domain.analysis.dto.response.InsightResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.TrendResponse;
+import com.atopy.Skinlog.domain.analysis.dto.response.TrendResponse.TrendPoint;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Direction;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Point;
 import com.atopy.Skinlog.domain.analysis.service.ChangePointDetector.Range;
+import com.atopy.Skinlog.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Skinlog.domain.record.entity.BodyPart;
 import com.atopy.Skinlog.domain.record.entity.SkinCondition;
 import com.atopy.Skinlog.domain.record.entity.SkinRecord;
@@ -51,6 +56,40 @@ public class AnalysisService {
 		List<InsightResponse> insights = available ? detectInsights(records) : List.of();
 		return new AnalysisSummaryResponse(
 			new AnalysisSummaryResponse.Period(startDate, endDate), records.size(), available, insights);
+	}
+
+	public TrendResponse trends(
+		Long memberId, BodyPart bodyPart, Symptom symptom, LocalDate startDate, LocalDate endDate) {
+		if (startDate.isAfter(endDate)) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "시작일은 종료일보다 늦을 수 없습니다.");
+		}
+		List<SkinRecord> records = recordRepository
+			.findByMemberIdAndRecordDateBetweenOrderByRecordDateAsc(memberId, startDate, endDate);
+
+		List<TrendPoint> points = new ArrayList<>();
+		for (SkinRecord record : records) {
+			record.getConditions().stream()
+				.filter(condition -> condition.getBodyPart() == bodyPart)
+				.findFirst()
+				.flatMap(condition -> condition.getScores().stream()
+					.filter(score -> score.getSymptom() == symptom)
+					.findFirst())
+				.ifPresent(score -> points.add(new TrendPoint(record.getRecordDate(), score.getScore())));
+		}
+		return new TrendResponse(bodyPart, symptom, points);
+	}
+
+	public ComparisonResponse comparison(Long memberId, LocalDate dateA, LocalDate dateB) {
+		return new ComparisonResponse(comparisonSide(memberId, dateA), comparisonSide(memberId, dateB));
+	}
+
+	private ComparisonSide comparisonSide(Long memberId, LocalDate date) {
+		return recordRepository.findByMemberIdAndRecordDate(memberId, date)
+			.map(record -> new ComparisonSide(date, record.getConditions().stream()
+				.sorted(Comparator.comparing(c -> c.getBodyPart().ordinal()))
+				.map(SkinConditionResponse::from)
+				.toList()))
+			.orElse(null);
 	}
 
 	/** 부위·증상별 점수 시계열마다 변화점을 찾아 인사이트로 만든다. */
