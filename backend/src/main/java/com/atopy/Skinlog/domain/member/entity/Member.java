@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -32,6 +33,9 @@ public class Member extends BaseTimeEntity {
 	@Column(nullable = false, length = 50)
 	private String nickname;
 
+	/** 챗봇 이용(대화·기록 내용을 외부 LLM에 전달)에 동의한 시각. 동의하지 않았거나 철회했으면 null */
+	private LocalDateTime llmConsentedAt;
+
 	@Builder
 	private Member(String email, String password, String nickname) {
 		this.email = email;
@@ -45,6 +49,21 @@ public class Member extends BaseTimeEntity {
 
 	public void changePassword(String encodedPassword) {
 		this.password = encodedPassword;
+	}
+
+	public boolean hasLlmConsent() {
+		return llmConsentedAt != null;
+	}
+
+	/** 이미 동의했다면 처음 동의한 시각을 그대로 둔다. */
+	public void agreeLlm(LocalDateTime now) {
+		if (llmConsentedAt == null) {
+			this.llmConsentedAt = now;
+		}
+	}
+
+	public void withdrawLlmConsent() {
+		this.llmConsentedAt = null;
 	}
 
 }

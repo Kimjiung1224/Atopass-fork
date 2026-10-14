@@ -38,6 +38,7 @@ public class ChatbotService {
 	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
 	static final String EXAMPLE = " 예: \"팔이 가려워요. 가려움은 4점이고 잠은 6시간 잤어요.\"";
 
+	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
 	private final ChatModelClient modelClient;
 	private final ChatPromptFactory promptFactory;
@@ -45,6 +46,7 @@ public class ChatbotService {
 	private final JsonMapper jsonMapper;
 
 	public ChatSessionResponse createSession(Long memberId, ChatMode mode) {
+		consentService.requireConsent(memberId);
 		return ChatSessionResponse.from(sessionService.open(memberId, mode));
 	}
 
@@ -57,6 +59,8 @@ public class ChatbotService {
 	}
 
 	public ChatReplyResponse sendMessage(Long memberId, String sessionId, String userText) {
+		// 대화 내용이 외부 LLM으로 나가므로, 동의하지 않았거나 철회한 회원이면 LLM을 부르기 전에 막는다.
+		consentService.requireConsent(memberId);
 		TurnContext context = sessionService.loadForTurn(memberId, sessionId);
 
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());

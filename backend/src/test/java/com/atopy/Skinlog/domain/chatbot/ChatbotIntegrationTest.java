@@ -45,6 +45,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	@Test
 	void 세션을_만들면_201과_세션_ID를_준다() throws Exception {
 		String bearer = newMemberBearer();
+		grantConsent(bearer);
 
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions").header(AUTH, bearer), Map.of("mode", "RECORD")))
 			.andExpect(status().isCreated())
@@ -433,6 +434,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String owner = newMemberBearer();
 		String session = createSession(owner, "RECORD");
 		String other = newMemberBearer();
+		grantConsent(other); // 동의한 회원이어도 남의 세션은 404여야 한다.
 
 		mockMvc.perform(sendMessage(other, session, "안녕"))
 			.andExpect(status().isNotFound())
@@ -473,12 +475,18 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 	// ── 헬퍼 ──
 
+	/** 챗봇은 이용 동의가 있어야 쓸 수 있으므로, 테스트에서는 먼저 동의(멱등)하고 세션을 만든다. */
 	private String createSession(String bearer, String mode) throws Exception {
+		grantConsent(bearer);
 		String body = mockMvc.perform(withJson(post("/api/v1/chatbot/sessions").header(AUTH, bearer),
 				Map.of("mode", mode)))
 			.andExpect(status().isCreated())
 			.andReturn().getResponse().getContentAsString();
 		return jsonMapper.readTree(body).get("data").get("sessionId").asString();
+	}
+
+	private void grantConsent(String bearer) throws Exception {
+		mockMvc.perform(post("/api/v1/chatbot/consent").header(AUTH, bearer)).andExpect(status().isOk());
 	}
 
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder sendMessage(
