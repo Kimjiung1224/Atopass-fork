@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: service
+  datasource:
+    url: jdbc:h2:mem:skinlog;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+
+app:
+  jwt:
+    secret: test-secret-test-secret-test-secret-1234
+    access-token-minutes: 30
+    refresh-token-days: 14
+    cookie-secure: true
+  cors:
+    allowed-origins: http://localhost:5173
