@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+
+/* 고령 사용자도 읽기 쉽도록 기본 글자 크기를 키운다 (프론트/백 정리: 큰 버튼, 쉬운 문구) */
+html {
+  font-size: 17px;
+}
+
+body {
+  font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  color: #111827;
+  background: #f9fafb;
+  word-break: keep-all;
+}
