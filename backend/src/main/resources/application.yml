@@ -14,6 +14,10 @@ spring:
         default_batch_fetch_size: 100
         jdbc:
           time_zone: Asia/Seoul
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
 
 app:
   jwt:
@@ -32,5 +36,6 @@ app:
     max-tokens: 2048
     timeout-seconds: 30
   storage:
-    # 보고서 PDF 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
+    # 보고서 PDF/사진 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
     report-dir: ${REPORT_DIR:./data/reports}
+    photo-dir: ${PHOTO_DIR:./data/photos}
