@@ -20,24 +20,20 @@ class ReportListIntegrationTest extends ApiTestSupport {
 	private static final LocalDate START = LocalDate.of(2026, 6, 1);
 
 	@Test
-	void 목록은_최신순으로_페이지로_준다() throws Exception {
+	void 목록을_최신순_배열로_준다() throws Exception {
 		String bearer = newMemberBearer();
 		createRecord(bearer, START, 4);
 		createReport(bearer, START, START.plusDays(1));
 		createReport(bearer, START, START.plusDays(2));
 		createReport(bearer, START, START.plusDays(3));
 
-		mockMvc.perform(list(bearer, 0, 2))
+		mockMvc.perform(list(bearer))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.totalElements").value(3))
-			.andExpect(jsonPath("$.data.totalPages").value(2))
-			.andExpect(jsonPath("$.data.content.length()").value(2))
-			.andExpect(jsonPath("$.data.content[0].endDate").value("2026-06-04"))
-			.andExpect(jsonPath("$.data.content[1].endDate").value("2026-06-03"));
-
-		mockMvc.perform(list(bearer, 1, 2))
-			.andExpect(jsonPath("$.data.content.length()").value(1))
-			.andExpect(jsonPath("$.data.content[0].endDate").value("2026-06-02"));
+			.andExpect(jsonPath("$.data.length()").value(3))
+			.andExpect(jsonPath("$.data[0].reportId").isNumber())
+			.andExpect(jsonPath("$.data[0].endDate").value("2026-06-04"))
+			.andExpect(jsonPath("$.data[1].endDate").value("2026-06-03"))
+			.andExpect(jsonPath("$.data[2].endDate").value("2026-06-02"));
 	}
 
 	@Test
@@ -48,8 +44,8 @@ class ReportListIntegrationTest extends ApiTestSupport {
 
 		createRecord(newMemberBearer(), START, 4);
 
-		mockMvc.perform(list(bearer, 0, 10))
-			.andExpect(jsonPath("$.data.totalElements").value(1));
+		mockMvc.perform(list(bearer))
+			.andExpect(jsonPath("$.data.length()").value(1));
 	}
 
 	@Test
@@ -89,9 +85,8 @@ class ReportListIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(get("/api/v1/reports/1")).andExpect(status().isUnauthorized());
 	}
 
-	private MockHttpServletRequestBuilder list(String bearer, int page, int size) {
-		return get("/api/v1/reports").header(AUTH, bearer)
-			.param("page", String.valueOf(page)).param("size", String.valueOf(size));
+	private MockHttpServletRequestBuilder list(String bearer) {
+		return get("/api/v1/reports").header(AUTH, bearer);
 	}
 
 	private void createReport(String bearer, LocalDate start, LocalDate end) throws Exception {

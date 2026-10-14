@@ -4,7 +4,6 @@ import com.atopy.Skinlog.domain.member.repository.MemberRepository;
 import com.atopy.Skinlog.domain.record.entity.SkinRecord;
 import com.atopy.Skinlog.domain.record.repository.RecordRepository;
 import com.atopy.Skinlog.domain.report.dto.request.ReportCreateRequest;
-import com.atopy.Skinlog.domain.report.dto.response.ReportPageResponse;
 import com.atopy.Skinlog.domain.report.dto.response.ReportResponse;
 import com.atopy.Skinlog.domain.report.entity.Report;
 import com.atopy.Skinlog.domain.report.repository.ReportRepository;
@@ -18,9 +17,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,11 +64,10 @@ public class ReportService {
 		return ReportResponse.from(report);
 	}
 
-	public ReportPageResponse list(Long memberId, int page, int size) {
-		Page<ReportResponse> result = reportRepository
-			.findByMemberId(memberId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
-			.map(ReportResponse::from);
-		return ReportPageResponse.from(result);
+	public List<ReportResponse> list(Long memberId) {
+		return reportRepository.findByMemberIdOrderByCreatedAtDesc(memberId).stream()
+			.map(ReportResponse::from)
+			.toList();
 	}
 
 	public ReportResponse get(Long memberId, Long reportId) {
