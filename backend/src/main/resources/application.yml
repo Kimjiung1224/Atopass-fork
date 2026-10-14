@@ -11,6 +11,7 @@ spring:
       ddl-auto: ${JPA_DDL_AUTO:update}
     properties:
       hibernate:
+        default_batch_fetch_size: 100
         jdbc:
           time_zone: Asia/Seoul
 
