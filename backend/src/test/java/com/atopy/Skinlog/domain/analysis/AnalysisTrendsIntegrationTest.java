@@ -22,18 +22,20 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	@Test
 	void 부위와_증상이_기록된_날짜만_포인트로_준다() throws Exception {
 		String bearer = newMemberBearer();
-		createRecord(bearer, START, "ARM", Map.of("itching", 3));
+		long firstId = createRecord(bearer, START, "ARM", Map.of("itching", 3));
 		// 둘째 날은 기록 자체가 없음
-		createRecord(bearer, START.plusDays(2), "ARM", Map.of("itching", 5));
+		long secondId = createRecord(bearer, START.plusDays(2), "ARM", Map.of("itching", 5));
 
 		mockMvc.perform(trends(bearer, "ARM", "itching", START, START.plusDays(5)))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.symptom").value("itching"))
+			.andExpect(jsonPath("$.data.bodyPart").doesNotExist())
+			.andExpect(jsonPath("$.data.symptom").doesNotExist())
 			.andExpect(jsonPath("$.data.points.length()").value(2))
 			.andExpect(jsonPath("$.data.points[0].date").value("2026-04-01"))
+			.andExpect(jsonPath("$.data.points[0].recordId").value(firstId))
 			.andExpect(jsonPath("$.data.points[0].score").value(3))
 			.andExpect(jsonPath("$.data.points[1].date").value("2026-04-03"))
+			.andExpect(jsonPath("$.data.points[1].recordId").value(secondId))
 			.andExpect(jsonPath("$.data.points[1].score").value(5));
 	}
 
@@ -91,7 +93,7 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 			.param("startDate", start.toString()).param("endDate", end.toString());
 	}
 
-	private void createRecord(String bearer, LocalDate date, String bodyPart, Map<String, Object> symptoms)
+	private long createRecord(String bearer, LocalDate date, String bodyPart, Map<String, Object> symptoms)
 		throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", bodyPart);
@@ -99,8 +101,10 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));
-		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
-			.andExpect(status().isCreated());
+		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		return jsonMapper.readTree(response).get("data").get("recordId").asLong();
 	}
 
 }

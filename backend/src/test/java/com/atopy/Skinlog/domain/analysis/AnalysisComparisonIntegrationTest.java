@@ -21,17 +21,24 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 	private static final LocalDate DATE_B = LocalDate.of(2026, 5, 10);
 
 	@Test
-	void 양쪽_다_기록이_있으면_둘_다_내려준다() throws Exception {
+	void 양쪽_다_기록이_있으면_A와_B키로_기록_전체를_내려준다() throws Exception {
 		String bearer = newMemberBearer();
-		createRecord(bearer, DATE_A, Map.of("itching", 2));
-		createRecord(bearer, DATE_B, Map.of("itching", 8));
+		long recordIdA = createRecord(bearer, DATE_A, Map.of("itching", 2));
+		long recordIdB = createRecord(bearer, DATE_B, Map.of("itching", 8));
 
 		mockMvc.perform(comparison(bearer, DATE_A, DATE_B))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.dateA.date").value("2026-05-01"))
-			.andExpect(jsonPath("$.data.dateA.skinConditions[0].symptoms.itching").value(2))
-			.andExpect(jsonPath("$.data.dateB.date").value("2026-05-10"))
-			.andExpect(jsonPath("$.data.dateB.skinConditions[0].symptoms.itching").value(8));
+			.andExpect(jsonPath("$.data.A.date").value("2026-05-01"))
+			.andExpect(jsonPath("$.data.A.recordId").value(recordIdA))
+			.andExpect(jsonPath("$.data.A.skinConditions[0].bodyPart").value("ARM"))
+			.andExpect(jsonPath("$.data.A.skinConditions[0].symptoms.itching").value(2))
+			.andExpect(jsonPath("$.data.A.sleepHours").value(6.0))
+			.andExpect(jsonPath("$.data.A.lifestyle.outdoorActivity").value("MEDIUM"))
+			.andExpect(jsonPath("$.data.A.notes").value("메모A"))
+			.andExpect(jsonPath("$.data.A.photos").isEmpty())
+			.andExpect(jsonPath("$.data.B.date").value("2026-05-10"))
+			.andExpect(jsonPath("$.data.B.recordId").value(recordIdB))
+			.andExpect(jsonPath("$.data.B.skinConditions[0].symptoms.itching").value(8));
 	}
 
 	@Test
@@ -41,8 +48,8 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(comparison(bearer, DATE_A, DATE_B))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.dateA.date").value("2026-05-01"))
-			.andExpect(jsonPath("$.data.dateB").doesNotExist());
+			.andExpect(jsonPath("$.data.A.date").value("2026-05-01"))
+			.andExpect(jsonPath("$.data.B").doesNotExist());
 	}
 
 	@Test
@@ -51,8 +58,8 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(comparison(newMemberBearer(), DATE_A, DATE_B))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.dateA").doesNotExist())
-			.andExpect(jsonPath("$.data.dateB").doesNotExist());
+			.andExpect(jsonPath("$.data.A").doesNotExist())
+			.andExpect(jsonPath("$.data.B").doesNotExist());
 	}
 
 	@Test
@@ -67,15 +74,20 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 			.param("dateA", dateA.toString()).param("dateB", dateB.toString());
 	}
 
-	private void createRecord(String bearer, LocalDate date, Map<String, Object> symptoms) throws Exception {
+	private long createRecord(String bearer, LocalDate date, Map<String, Object> symptoms) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
 		condition.put("symptoms", symptoms);
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));
-		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
-			.andExpect(status().isCreated());
+		body.put("sleepHours", 6);
+		body.put("lifestyle", Map.of("outdoorActivity", "MEDIUM"));
+		body.put("notes", "메모" + (date.equals(DATE_A) ? "A" : "B"));
+		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		return jsonMapper.readTree(response).get("data").get("recordId").asLong();
 	}
 
 }
