@@ -1,18 +1,16 @@
 package com.atopy.Skinlog.domain.report.service;
 
-import com.atopy.Skinlog.domain.record.entity.BodyPart;
 import com.atopy.Skinlog.domain.record.entity.OutdoorActivity;
-import com.atopy.Skinlog.domain.record.entity.Symptom;
 import com.atopy.Skinlog.domain.report.service.ReportContent.DayEntry;
+import com.atopy.Skinlog.domain.report.service.ReportContent.FlareDay;
 import com.atopy.Skinlog.domain.report.service.ReportContent.LifestyleSummary;
-import com.atopy.Skinlog.domain.report.service.ReportContent.SymptomSummary;
-import java.time.LocalDate;
+import com.atopy.Skinlog.domain.report.service.ReportContent.ScoreJump;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,6 +25,10 @@ class ReportHtmlBuilder {
 		"이 기록은 환자가 입력한 상태 변화를 정리한 자료이며, 의료진의 판단을 대체하지 않습니다.";
 
 	private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd", Locale.KOREA);
+	private static final DateTimeFormatter DATE_WITH_DAY = DateTimeFormatter.ofPattern("yyyy.MM.dd (E)", Locale.KOREA);
+	private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("MM.dd", Locale.KOREA);
+	/** 기간 평균보다 이만큼(시간) 이상 적게 자면 "평소보다 짧은 수면"으로 본다 */
+	private static final double SHORT_SLEEP_GAP = 1.5;
 
 	String build(ReportContent content) {
 		StringBuilder html = new StringBuilder(8192);
@@ -39,9 +41,8 @@ class ReportHtmlBuilder {
 			.append("<style>").append(css()).append("</style></head><body>");
 
 		header(html, content);
-		symptomSection(html, content.symptomSummaries());
-		daySection(html, content.days());
-		lifestyleSection(html, content.lifestyle());
+		flareSection(html, content);
+		patternSection(html, content);
 		notesSection(html, content.days());
 		if (content.includePhotos()) {
 			photoSection(html, content.days());
@@ -56,60 +57,121 @@ class ReportHtmlBuilder {
 			.append("<table class=\"meta\">")
 			.append(row("조회 기간", DATE.format(content.startDate()) + " ~ " + DATE.format(content.endDate())))
 			.append(row("기록 수", content.recordCount() + "일"))
+			.append(row("증상이 갑자기 심해진 날", content.flareDays().size() + "일"))
+			.append(row("평소 생활 (기간 평균)", usualLifestyleText(content.lifestyle())))
 			.append(row("작성일", DATE.format(content.generatedDate())))
 			.append("</table>");
 	}
 
-	private void symptomSection(StringBuilder html, List<SymptomSummary> summaries) {
-		html.append("<h2>부위별 증상 점수 변화</h2>")
-			.append("<p class=\"hint\">점수는 환자가 느낀 주관적인 정도(0~10)입니다. 의료적인 중증도가 아닙니다.</p>");
-		if (summaries.isEmpty()) {
-			html.append("<p>기록된 증상 점수가 없습니다.</p>");
+	private void flareSection(StringBuilder html, ReportContent content) {
+		html.append("<h2>증상이 갑자기 심해진 날</h2>")
+			.append("<p class=\"hint\">같은 부위·증상이 직전 기록보다 ").append(ReportContentFactory.FLARE_JUMP)
+			.append("점 이상 오른 날입니다. 점수는 환자가 느낀 주관적인 정도(0~10)이며 의료적인 중증도가 아닙니다. ")
+			.append("평소와 달랐던 생활은 굵게 표시했습니다.</p>");
+		if (content.flareDays().isEmpty()) {
+			html.append("<p>이 기간에는 증상이 갑자기 심해진 날이 없습니다.</p>");
 			return;
 		}
-		html.append("<table class=\"grid\"><tr><th>부위</th><th>증상</th><th>기록 수</th><th>평균</th>")
-			.append("<th>최저</th><th>최고</th><th>처음 → 마지막</th></tr>");
-		for (SymptomSummary s : summaries) {
-			html.append("<tr><td>").append(escape(s.bodyPart().label())).append("</td>")
-				.append("<td>").append(escape(s.symptom().label())).append("</td>")
-				.append("<td class=\"num\">").append(s.count()).append("</td>")
-				.append("<td class=\"num\">").append(String.format(Locale.ROOT, "%.1f", s.average())).append("</td>")
-				.append("<td class=\"num\">").append(s.min()).append("</td>")
-				.append("<td class=\"num\">").append(s.max()).append("</td>")
-				.append("<td>").append(s.firstScore()).append("점 (").append(DATE.format(s.firstDate()))
-				.append(") → ").append(s.lastScore()).append("점 (").append(DATE.format(s.lastDate()))
-				.append(")</td></tr>");
+		Double usualSleep = content.lifestyle().averageSleepHours();
+		for (FlareDay flare : content.flareDays()) {
+			DayEntry day = flare.day();
+			html.append("<div class=\"flare\"><h3>").append(DATE_WITH_DAY.format(day.date())).append("</h3><ul>");
+			for (ScoreJump jump : flare.jumps()) {
+				html.append("<li>").append(escape(jump.bodyPart().label())).append(' ')
+					.append(escape(jump.symptom().label())).append(" <b>").append(jump.previousScore())
+					.append("점 → ").append(jump.score()).append("점</b> (").append(SHORT_DATE.format(jump.previousDate()))
+					.append(" 기록 대비 +").append(jump.score() - jump.previousScore()).append(")</li>");
+			}
+			html.append("</ul><table class=\"meta\">")
+				.append(rawRow("당일", lifestyleText(day, usualSleep)))
+				.append(rawRow("전날", flare.dayBefore() == null ? "기록 없음" : lifestyleText(flare.dayBefore(), usualSleep)));
+			String notes = flareNotes(flare);
+			if (!notes.isEmpty()) {
+				html.append(rawRow("메모", notes));
+			}
+			html.append("</table></div>");
 		}
-		html.append("</table>");
 	}
 
-	private void daySection(StringBuilder html, List<DayEntry> days) {
-		html.append("<h2>날짜별 피부 상태 기록</h2>")
-			.append("<table class=\"grid\"><tr><th>날짜</th><th>부위별 증상 점수</th><th>수면</th>")
-			.append("<th>음주</th><th>야외활동</th></tr>");
-		for (DayEntry day : days) {
-			html.append("<tr><td class=\"nowrap\">").append(DATE.format(day.date())).append("</td><td>")
-				.append(conditionsText(day.conditions())).append("</td>")
-				.append("<td>").append(day.sleepHours() == null ? "-"
-					: day.sleepHours().stripTrailingZeros().toPlainString() + "시간").append("</td>")
-				.append("<td>").append(day.alcohol() == null ? "-" : day.alcohol() ? "있음" : "없음").append("</td>")
-				.append("<td>").append(outdoorText(day.outdoorActivity())).append("</td></tr>");
+	/**
+	 * 심해진 날(당일 또는 전날)에 평소와 다른 생활이 몇 번 겹쳤는지 센다.
+	 * 원인을 판단하지 않고, 함께 나타난 횟수와 기간 전체 횟수만 나란히 보여 준다.
+	 */
+	private void patternSection(StringBuilder html, ReportContent content) {
+		List<FlareDay> flares = content.flareDays();
+		if (flares.size() < 2) {
+			return;
 		}
-		html.append("</table>");
+		Double usualSleep = content.lifestyle().averageSleepHours();
+		List<String> lines = new ArrayList<>();
+		addPattern(lines, flares, "음주가", d -> Boolean.TRUE.equals(d.alcohol()),
+			"기간 전체 음주 " + content.lifestyle().alcoholDays() + "일");
+		addPattern(lines, flares, "평소보다 짧은 수면이", d -> isShortSleep(d, usualSleep), null);
+		addPattern(lines, flares, "많은 야외활동이", d -> d.outdoorActivity() == OutdoorActivity.HIGH,
+			"기간 전체 " + content.lifestyle().outdoorDays().getOrDefault(OutdoorActivity.HIGH, 0) + "일");
+		if (lines.isEmpty()) {
+			return;
+		}
+		html.append("<h2>반복해서 보인 점</h2>")
+			.append("<p class=\"hint\">함께 나타난 횟수일 뿐이며, 원인을 뜻하지 않습니다.</p><ul>");
+		lines.forEach(line -> html.append("<li>").append(escape(line)).append("</li>"));
+		html.append("</ul>");
 	}
 
-	private void lifestyleSection(StringBuilder html, LifestyleSummary lifestyle) {
-		html.append("<h2>수면 및 생활 정보</h2><table class=\"meta\">")
-			.append(row("평균 수면", lifestyle.averageSleepHours() == null ? "기록 없음"
-				: String.format(Locale.ROOT, "%.1f시간 (%d일 기록)", lifestyle.averageSleepHours(),
-					lifestyle.sleepRecordedDays())))
-			.append(row("음주", lifestyle.alcoholRecordedDays() == 0 ? "기록 없음"
-				: lifestyle.alcoholDays() + "일 (" + lifestyle.alcoholRecordedDays() + "일 기록 중)"))
-			.append(row("야외활동", lifestyle.outdoorDays().isEmpty() ? "기록 없음"
-				: lifestyle.outdoorDays().entrySet().stream()
-					.map(e -> outdoorText(e.getKey()) + " " + e.getValue() + "일")
-					.collect(Collectors.joining(", "))))
-			.append("</table>");
+	private void addPattern(List<String> lines, List<FlareDay> flares, String label, Predicate<DayEntry> matches,
+		String total) {
+		long count = flares.stream()
+			.filter(f -> matches.test(f.day()) || (f.dayBefore() != null && matches.test(f.dayBefore())))
+			.count();
+		if (count >= 2) {
+			lines.add("갑자기 심해진 " + flares.size() + "일 중 " + count + "일은 당일 또는 전날 " + label + " 있었습니다."
+				+ (total == null ? "" : " (" + total + ")"));
+		}
+	}
+
+	/** 수면·음주·야외활동 중 기록한 것만 보여 주고, 평소와 다른 것은 굵게 표시한다 (이스케이프된 XHTML) */
+	private String lifestyleText(DayEntry day, Double usualSleep) {
+		List<String> parts = new ArrayList<>();
+		if (day.sleepHours() != null) {
+			String sleep = "수면 " + day.sleepHours().stripTrailingZeros().toPlainString() + "시간";
+			parts.add(isShortSleep(day, usualSleep)
+				? "<b>" + sleep + String.format(Locale.ROOT, " (평소 %.1f시간)", usualSleep) + "</b>" : sleep);
+		}
+		if (day.alcohol() != null) {
+			parts.add(day.alcohol() ? "<b>음주 있음</b>" : "음주 없음");
+		}
+		if (day.outdoorActivity() != null) {
+			String outdoor = "야외활동 " + outdoorText(day.outdoorActivity());
+			parts.add(day.outdoorActivity() == OutdoorActivity.HIGH ? "<b>" + outdoor + "</b>" : outdoor);
+		}
+		return parts.isEmpty() ? "생활 기록 없음" : String.join(" · ", parts);
+	}
+
+	private boolean isShortSleep(DayEntry day, Double usualSleep) {
+		return usualSleep != null && day.sleepHours() != null
+			&& day.sleepHours().doubleValue() <= usualSleep - SHORT_SLEEP_GAP;
+	}
+
+	private String flareNotes(FlareDay flare) {
+		List<String> notes = new ArrayList<>();
+		if (flare.dayBefore() != null && flare.dayBefore().notes() != null) {
+			notes.add("전날: " + escape(flare.dayBefore().notes()));
+		}
+		if (flare.day().notes() != null) {
+			notes.add("당일: " + escape(flare.day().notes()));
+		}
+		return String.join("<br/>", notes);
+	}
+
+	private String usualLifestyleText(LifestyleSummary lifestyle) {
+		List<String> parts = new ArrayList<>();
+		if (lifestyle.averageSleepHours() != null) {
+			parts.add(String.format(Locale.ROOT, "수면 %.1f시간", lifestyle.averageSleepHours()));
+		}
+		if (lifestyle.alcoholRecordedDays() > 0) {
+			parts.add("음주 " + lifestyle.alcoholDays() + "일");
+		}
+		return parts.isEmpty() ? "기록 없음" : String.join(" · ", parts);
 	}
 
 	private void notesSection(StringBuilder html, List<DayEntry> days) {
@@ -146,14 +208,6 @@ class ReportHtmlBuilder {
 		}
 	}
 
-	private String conditionsText(Map<BodyPart, Map<Symptom, Integer>> conditions) {
-		return conditions.entrySet().stream()
-			.map(e -> escape(e.getKey().label()) + ": " + e.getValue().entrySet().stream()
-				.map(s -> escape(s.getKey().label()) + " " + s.getValue())
-				.collect(Collectors.joining(", ")))
-			.collect(Collectors.joining("<br/>"));
-	}
-
 	private String outdoorText(OutdoorActivity activity) {
 		if (activity == null) {
 			return "-";
@@ -166,7 +220,12 @@ class ReportHtmlBuilder {
 	}
 
 	private String row(String label, String value) {
-		return "<tr><th>" + escape(label) + "</th><td>" + escape(value) + "</td></tr>";
+		return rawRow(label, escape(value));
+	}
+
+	/** @param html 이미 이스케이프된 XHTML */
+	private String rawRow(String label, String html) {
+		return "<tr><th>" + escape(label) + "</th><td>" + html + "</td></tr>";
 	}
 
 	/** XML에서 의미가 있는 문자를 모두 바꾼다. 줄바꿈은 보이도록 유지한다. */
@@ -213,6 +272,10 @@ class ReportHtmlBuilder {
 			td.num { text-align: right; }
 			td.nowrap { white-space: nowrap; }
 			tr { page-break-inside: avoid; }
+			h3 { font-size: 11pt; margin: 0 0 4pt 0; color: #1f3a5f; }
+			ul { margin: 2pt 0 4pt 0; padding-left: 14pt; }
+			li { margin: 1pt 0; }
+			.flare { page-break-inside: avoid; margin: 8pt 0; padding: 6pt 8pt; border: 1px solid #c8d0dc; border-left: 3px solid #c0392b; }
 			.photos { page-break-inside: avoid; margin-bottom: 8pt; }
 			.photo-date { font-weight: bold; }
 			img.photo { max-width: 160pt; max-height: 160pt; margin: 2pt 6pt 2pt 0; }

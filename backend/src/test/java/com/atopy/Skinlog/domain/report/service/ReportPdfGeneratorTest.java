@@ -34,7 +34,7 @@ class ReportPdfGeneratorTest {
 		String text = textOf(pdf);
 		assertThat(text)
 			.contains("진료 참고용 피부 기록")
-			.contains("부위별 증상 점수 변화")
+			.contains("증상이 갑자기 심해진 날")
 			.contains("가려움")
 			.contains("저녁에 팔이 가려웠음")
 			.contains("의료진의 판단을 대체하지 않습니다.");
@@ -69,7 +69,7 @@ class ReportPdfGeneratorTest {
 				day.sleepHours(), day.alcohol(), day.outdoorActivity(), "메모 " + i, List.of()));
 		}
 		ReportContent content = new ReportContent(base.startDate(), base.endDate(), base.generatedDate(),
-			manyDays.size(), false, base.symptomSummaries(), manyDays, base.lifestyle());
+			manyDays.size(), false, ReportContentFactory.flareDays(manyDays), manyDays, base.lifestyle());
 
 		byte[] pdf = generator.generate(htmlBuilder.build(content));
 
