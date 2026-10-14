@@ -52,6 +52,10 @@ public class ChatSession extends BaseTimeEntity {
 	@Column(nullable = false)
 	private int failCount;
 
+	/** 마지막 응답에서 기록 초안 확인(총정리) 단계로 넘어가도록 알렸는지. 새로고침 뒤에도 같은 값을 주기 위해 저장한다. */
+	@Column(nullable = false)
+	private boolean confirmationReady;
+
 	/** 기록을 저장해 더 이상 대화할 수 없으면 true */
 	@Column(nullable = false)
 	private boolean closed;
@@ -65,9 +69,10 @@ public class ChatSession extends BaseTimeEntity {
 		return session;
 	}
 
-	public void updateTurn(String draft, int failCount) {
+	public void updateTurn(String draft, int failCount, boolean confirmationReady) {
 		this.draft = draft;
 		this.failCount = failCount;
+		this.confirmationReady = confirmationReady;
 	}
 
 	public void close() {
