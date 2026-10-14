@@ -24,3 +24,10 @@ app:
     cookie-secure: ${COOKIE_SECURE:true}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  llm:
+    # Claude API 키. 환경변수 ANTHROPIC_API_KEY로만 주입한다. 없으면 챗봇은 503(CHATBOT_UNAVAILABLE)을 반환한다.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${LLM_MODEL:claude-opus-5-5}
+    effort: ${LLM_EFFORT:low}
+    max-tokens: 2048
+    timeout-seconds: 30
