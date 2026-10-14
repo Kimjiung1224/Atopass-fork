@@ -3,6 +3,7 @@ package com.atopy.Skinlog.domain.chatbot.controller;
 import com.atopy.Skinlog.domain.chatbot.dto.request.ChatMessageRequest;
 import com.atopy.Skinlog.domain.chatbot.dto.request.ChatRecordSaveRequest;
 import com.atopy.Skinlog.domain.chatbot.dto.request.CreateSessionRequest;
+import com.atopy.Skinlog.domain.chatbot.dto.response.ChatDraftStateResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatMessagesResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatReplyResponse;
 import com.atopy.Skinlog.domain.chatbot.dto.response.ChatSessionResponse;
@@ -46,6 +47,13 @@ public class ChatbotController {
 	public ApiResponse<ChatMessagesResponse> messages(
 		@CurrentMember Long memberId, @PathVariable String sessionId) {
 		return ApiResponse.ok(chatbotService.messages(memberId, sessionId));
+	}
+
+	/** 새로고침 뒤에도 일일 총정리 화면이 초안을 다시 채울 수 있도록 세션의 현재 초안을 준다. */
+	@GetMapping("/{sessionId}/draft")
+	public ApiResponse<ChatDraftStateResponse> draft(
+		@CurrentMember Long memberId, @PathVariable String sessionId) {
+		return ApiResponse.ok(chatbotService.draft(memberId, sessionId));
 	}
 
 	@PostMapping("/{sessionId}/records")
