@@ -25,7 +25,7 @@ public class MemberService {
 
 	@Transactional
 	public MemberResponse updateMe(Long memberId, MemberUpdateRequest request) {
-		if (!request.hasNickname() && !request.hasNewPassword()) {
+		if (!request.hasNickname() && !request.hasPassword()) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "수정할 내용이 없습니다.");
 		}
 
@@ -34,11 +34,8 @@ public class MemberService {
 		if (request.hasNickname()) {
 			member.changeNickname(request.nickname());
 		}
-		if (request.hasNewPassword()) {
-			if (!passwordEncoder.matches(request.currentPassword(), member.getPassword())) {
-				throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
-			}
-			member.changePassword(passwordEncoder.encode(request.newPassword()));
+		if (request.hasPassword()) {
+			member.changePassword(passwordEncoder.encode(request.password()));
 		}
 
 		return MemberResponse.from(member);

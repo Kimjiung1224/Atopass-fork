@@ -6,18 +6,16 @@ public record MemberUpdateRequest(
 	@Size(max = 50, message = "닉네임은 50자 이하여야 합니다.")
 	String nickname,
 
-	String currentPassword,
-
 	@Size(min = 8, max = 64, message = "비밀번호는 8~64자여야 합니다.")
-	String newPassword
+	String password
 ) {
 
 	public boolean hasNickname() {
 		return nickname != null && !nickname.isBlank();
 	}
 
-	public boolean hasNewPassword() {
-		return newPassword != null && !newPassword.isBlank();
+	public boolean hasPassword() {
+		return password != null && !password.isBlank();
 	}
 
 }

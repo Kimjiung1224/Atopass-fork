@@ -45,12 +45,12 @@ class MemberIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 현재_비밀번호를_확인하고_비밀번호를_변경한다() throws Exception {
+	void 비밀번호를_변경한다() throws Exception {
 		String email = "pw-change-" + System.nanoTime() + "@example.com";
 		String bearer = newMemberBearer(email);
 
 		mockMvc.perform(withJson(patch("/api/v1/members/me").header(AUTH, bearer),
-				Map.of("currentPassword", PASSWORD, "newPassword", "new-password1")))
+				Map.of("password", "new-password1")))
 			.andExpect(status().isOk());
 
 		mockMvc.perform(withJson(post("/api/v1/auth/login"), Map.of("email", email, "password", "new-password1")))
@@ -58,13 +58,12 @@ class MemberIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 현재_비밀번호가_틀리면_401을_반환한다() throws Exception {
+	void 비밀번호_길이가_범위를_벗어나면_400을_반환한다() throws Exception {
 		String bearer = newMemberBearer();
 
-		mockMvc.perform(withJson(patch("/api/v1/members/me").header(AUTH, bearer),
-				Map.of("currentPassword", "wrong-password", "newPassword", "new-password1")))
-			.andExpect(status().isUnauthorized())
-			.andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+		mockMvc.perform(withJson(patch("/api/v1/members/me").header(AUTH, bearer), Map.of("password", "short")))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
 	}
 
 	@Test
