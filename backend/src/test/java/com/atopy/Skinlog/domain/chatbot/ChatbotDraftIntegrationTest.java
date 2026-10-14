@@ -187,7 +187,9 @@ class ChatbotDraftIntegrationTest extends ApiTestSupport {
 		return "/api/v1/chatbot/sessions/" + session + "/draft";
 	}
 
+	/** 챗봇은 이용 동의가 있어야 쓸 수 있으므로, 테스트에서는 먼저 동의(멱등)하고 세션을 만든다. */
 	private String createSession(String bearer, String mode) throws Exception {
+		mockMvc.perform(post("/api/v1/chatbot/consent").header(AUTH, bearer)).andExpect(status().isOk());
 		String body = mockMvc.perform(withJson(post("/api/v1/chatbot/sessions").header(AUTH, bearer),
 				Map.of("mode", mode)))
 			.andExpect(status().isCreated())
