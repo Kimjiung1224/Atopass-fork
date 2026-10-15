@@ -44,30 +44,33 @@ class ReportHtmlBuilderTest {
 		assertThat(html)
 			.contains("진료 참고용 피부 기록")
 			.contains("2026.03.01 ~ 2026.03.31")
-			.contains("부위별 증상 점수 변화")
-			.contains("날짜별 피부 상태 기록")
-			.contains("수면 및 생활 정보")
+			.contains("증상이 갑자기 심해진 날")
 			.contains("특이사항 및 메모")
-			.contains("의료진의 판단을 대체하지 않습니다.");
+			.contains("의료진의 판단을 대체하지 않습니다.")
+			// 기간 전체를 요약한 표는 넣지 않는다.
+			.doesNotContain("날짜별 피부 상태 기록")
+			.doesNotContain("부위별 증상 점수 변화");
 	}
 
 	@Test
-	void 부위와_증상_점수를_한글로_보여준다() {
-		String html = builder.build(ReportSamples.content(false, null, List.of()));
+	void 갑자기_심해진_날에는_오른_점수와_당일_전날_생활을_함께_보여준다() {
+		String html = builder.build(ReportSamples.content(false, "회식", List.of()));
 
 		assertThat(html)
-			.contains("팔: 가려움 4, 붉어짐 3")
-			.contains("<td>팔</td><td>가려움</td>")
-			.contains("<td class=\"num\">5.0</td>")
-			.contains("4점 (2026.03.01) → 6점 (2026.03.02)");
+			.contains("<h3>2026.03.02 (월)</h3>")
+			.contains("팔 가려움 <b>4점 → 7점</b> (03.01 기록 대비 +3)")
+			.contains("<th>당일</th><td><b>음주 있음</b></td>")
+			.contains("<th>전날</th><td>수면 6시간 · 음주 없음 · 야외활동 보통</td>")
+			.contains("<th>메모</th><td>당일: 회식</td>");
 	}
 
 	@Test
-	void 기록하지_않은_값은_빈칸_표시로_두고_임의의_값을_채우지_않는다() {
-		String html = builder.build(ReportSamples.content(false, null, List.of()));
+	void 심해진_날이_없으면_없다고_알려_준다() {
+		ReportContent base = ReportSamples.content(false, null, List.of());
+		ReportContent calm = new ReportContent(base.startDate(), base.endDate(), base.generatedDate(),
+			base.recordCount(), false, List.of(), base.days(), base.lifestyle());
 
-		// 둘째 날: 수면과 야외활동은 기록하지 않았다.
-		assertThat(html).contains("<td>-</td><td>있음</td><td>-</td>");
+		assertThat(builder.build(calm)).contains("이 기간에는 증상이 갑자기 심해진 날이 없습니다.");
 	}
 
 	@Test

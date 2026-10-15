@@ -7,8 +7,9 @@ import com.atopy.Skinlog.domain.record.entity.SkinRecord;
 import com.atopy.Skinlog.domain.record.entity.Symptom;
 import com.atopy.Skinlog.domain.record.entity.SymptomScore;
 import com.atopy.Skinlog.domain.report.service.ReportContent.DayEntry;
+import com.atopy.Skinlog.domain.report.service.ReportContent.FlareDay;
 import com.atopy.Skinlog.domain.report.service.ReportContent.LifestyleSummary;
-import com.atopy.Skinlog.domain.report.service.ReportContent.SymptomSummary;
+import com.atopy.Skinlog.domain.report.service.ReportContent.ScoreJump;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -26,12 +27,44 @@ class ReportContentFactory {
 
 	private final ReportPhotoSource photoSource;
 
+	/** 같은 부위·증상이 직전 기록보다 이만큼 이상 오르면 "갑자기 심해진 날"로 본다 */
+	static final int FLARE_JUMP = 3;
+
 	/** @param records 기간 내 기록. 날짜 오름차순이어야 한다. */
 	ReportContent create(List<SkinRecord> records, LocalDate startDate, LocalDate endDate,
 		boolean includePhotos, LocalDate today) {
 		List<DayEntry> days = records.stream().map(r -> dayEntry(r, includePhotos)).toList();
 		return new ReportContent(startDate, endDate, today, records.size(), includePhotos,
-			symptomSummaries(records), days, lifestyleSummary(records));
+			flareDays(days), days, lifestyleSummary(records));
+	}
+
+	/**
+	 * 부위·증상마다 직전에 기록한 점수와 비교해 {@link #FLARE_JUMP}점 이상 오른 날을 고른다.
+	 * 기간 첫 기록은 비교할 직전 기록이 없어 고르지 않는다.
+	 */
+	static List<FlareDay> flareDays(List<DayEntry> days) {
+		record Last(LocalDate date, int score) {
+		}
+		Map<BodyPart, Map<Symptom, Last>> last = new EnumMap<>(BodyPart.class);
+		List<FlareDay> flares = new ArrayList<>();
+		DayEntry previous = null;
+		for (DayEntry day : days) {
+			List<ScoreJump> jumps = new ArrayList<>();
+			day.conditions().forEach((bodyPart, scores) -> scores.forEach((symptom, score) -> {
+				Last before = last.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class)).get(symptom);
+				if (before != null && score - before.score() >= FLARE_JUMP) {
+					jumps.add(new ScoreJump(bodyPart, symptom, before.date(), before.score(), score));
+				}
+				last.get(bodyPart).put(symptom, new Last(day.date(), score));
+			}));
+			if (!jumps.isEmpty()) {
+				jumps.sort(Comparator.comparingInt((ScoreJump j) -> j.score() - j.previousScore()).reversed());
+				boolean hasDayBefore = previous != null && previous.date().equals(day.date().minusDays(1));
+				flares.add(new FlareDay(day, hasDayBefore ? previous : null, jumps));
+			}
+			previous = day;
+		}
+		return flares;
 	}
 
 	private DayEntry dayEntry(SkinRecord record, boolean includePhotos) {
@@ -46,34 +79,6 @@ class ReportContentFactory {
 		List<ReportPhoto> photos = includePhotos ? photoSource.photosOf(record.getId()) : List.of();
 		return new DayEntry(record.getRecordDate(), conditions, record.getSleepHours(),
 			record.getAlcohol(), record.getOutdoorActivity(), record.getNotes(), photos);
-	}
-
-	/** 부위·증상별로 기간 내 점수의 개수, 평균, 최저, 최고, 처음과 마지막 값을 구한다. */
-	private List<SymptomSummary> symptomSummaries(List<SkinRecord> records) {
-		record Point(LocalDate date, int score) {
-		}
-		Map<BodyPart, Map<Symptom, List<Point>>> series = new EnumMap<>(BodyPart.class);
-		for (SkinRecord record : records) {
-			for (SkinCondition condition : record.getConditions()) {
-				for (SymptomScore score : condition.getScores()) {
-					series.computeIfAbsent(condition.getBodyPart(), k -> new EnumMap<>(Symptom.class))
-						.computeIfAbsent(score.getSymptom(), k -> new ArrayList<>())
-						.add(new Point(record.getRecordDate(), score.getScore()));
-				}
-			}
-		}
-		List<SymptomSummary> summaries = new ArrayList<>();
-		series.forEach((bodyPart, bySymptom) -> bySymptom.forEach((symptom, points) -> {
-			points.sort(Comparator.comparing(Point::date));
-			Point first = points.get(0);
-			Point last = points.get(points.size() - 1);
-			summaries.add(new SymptomSummary(bodyPart, symptom, points.size(),
-				points.stream().mapToInt(Point::score).average().orElse(0),
-				points.stream().mapToInt(Point::score).min().orElse(0),
-				points.stream().mapToInt(Point::score).max().orElse(0),
-				first.date(), first.score(), last.date(), last.score()));
-		}));
-		return summaries;
 	}
 
 	private LifestyleSummary lifestyleSummary(List<SkinRecord> records) {
