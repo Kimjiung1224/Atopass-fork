@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ComparisonDay, ComparisonResponse } from '@/types/analysis';
 import type { BodyPart, SymptomKey } from '@/types/record';
 import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SYMPTOM_LABELS } from '@/utils/constants';
 import { formatKoreanDate } from '@/utils/date';
+import { bodyPartScoreOf } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
 import SavedPhotoList from './SavedPhotoList';
 
@@ -16,31 +17,28 @@ interface Props {
 const BODY_PART_ORDER = Object.keys(BODY_PART_LABELS) as BodyPart[];
 const SYMPTOM_ORDER = Object.keys(SYMPTOM_LABELS) as SymptomKey[];
 
-/** 그날 해당 부위·증상 점수. 기록이 없거나 기록하지 않은 증상은 null (0으로 채우지 않는다) */
-function scoreOf(day: ComparisonDay | null, bodyPart: BodyPart, symptom: SymptomKey): number | null {
+/** 그날 해당 부위의 증상 점수(증상 평균). 기록이 없거나 증상을 기록하지 않은 부위는 null */
+const scoreOf = (day: ComparisonDay | null, bodyPart: BodyPart) => bodyPartScoreOf(day?.skinConditions, bodyPart);
+
+/** 그날 해당 부위·증상 점수. 기록하지 않은 증상은 null */
+function symptomScoreOf(day: ComparisonDay | null, bodyPart: BodyPart, symptom: SymptomKey): number | null {
   const score = day?.skinConditions.find((c) => c.bodyPart === bodyPart)?.symptoms[symptom];
   return typeof score === 'number' ? score : null;
 }
 
-/** 두 날 중 한쪽이라도 기록한 부위·증상 (부위 → 증상 순서 고정) */
-function symptomRows(a: ComparisonDay | null, b: ComparisonDay | null) {
-  const recorded = new Set<string>();
-  for (const day of [a, b]) {
-    for (const condition of day?.skinConditions ?? []) {
-      for (const [symptom, score] of Object.entries(condition.symptoms)) {
-        if (typeof score === 'number') recorded.add(`${condition.bodyPart}:${symptom}`);
-      }
-    }
-  }
-  return BODY_PART_ORDER.flatMap((bodyPart) =>
-    SYMPTOM_ORDER.filter((symptom) => recorded.has(`${bodyPart}:${symptom}`)).map((symptom) => ({ bodyPart, symptom })),
-  );
+/** 소수 평균끼리 뺄 때 생기는 오차(0.30000000000000004 등)를 없앤다 */
+const diff = (a: number | null, b: number | null) => (a !== null && b !== null ? Math.round((b - a) * 10) / 10 : null);
+const scoreText = (score: number | null) => (score === null ? null : `${score}점`);
+
+/** 두 날 중 한쪽이라도 증상을 기록한 부위 (부위 순서 고정) */
+function bodyPartRows(a: ComparisonDay | null, b: ComparisonDay | null) {
+  return BODY_PART_ORDER.filter((bodyPart) => scoreOf(a, bodyPart) !== null || scoreOf(b, bodyPart) !== null);
 }
 
 /** 두 날짜(A·B) 기록을 나란히 비교한다. 기록이 없는 쪽은 "기록 없음"으로 보여 준다 */
 export default function ComparisonView({ dateA, dateB, comparison }: Props) {
   const { A: a, B: b } = comparison;
-  const rows = symptomRows(a, b);
+  const rows = bodyPartRows(a, b);
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,23 +51,11 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
         <p className="rounded-2xl bg-gray-50 py-8 text-center text-gray-400">두 날짜 모두 기록이 없어요.</p>
       ) : (
         <>
-          <CompareSection title="부위·증상 점수">
+          <CompareSection title="부위별 증상 점수" hint="부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.">
             {rows.length === 0 ? (
               <p className="py-2 text-center text-gray-400">{EMPTY_TEXT}</p>
             ) : (
-              rows.map(({ bodyPart, symptom }) => {
-                const scoreA = scoreOf(a, bodyPart, symptom);
-                const scoreB = scoreOf(b, bodyPart, symptom);
-                return (
-                  <CompareRow
-                    key={`${bodyPart}:${symptom}`}
-                    label={`${BODY_PART_LABELS[bodyPart]} ${SYMPTOM_LABELS[symptom]}`}
-                    valueA={scoreA === null ? null : `${scoreA}점`}
-                    valueB={scoreB === null ? null : `${scoreB}점`}
-                    change={scoreA !== null && scoreB !== null ? scoreB - scoreA : null}
-                  />
-                );
-              })
+              rows.map((bodyPart) => <BodyPartCompareRow key={bodyPart} bodyPart={bodyPart} a={a} b={b} />)
             )}
           </CompareSection>
 
@@ -127,12 +113,60 @@ function DayHeader({ tag, date, day }: { tag: 'A' | 'B'; date: string; day: Comp
   );
 }
 
-function CompareSection({ title, children }: { title: string; children: ReactNode }) {
+function CompareSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <section>
       <h3 className="mb-2 font-bold">{title}</h3>
       <div className="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-200 px-3">{children}</div>
+      {hint && <p className="mt-1.5 text-sm text-gray-400">{hint}</p>}
     </section>
+  );
+}
+
+/** 부위 한 줄(증상 평균). 누르면 두 날 중 한쪽이라도 기록한 증상별 A·B 점수를 펼친다 */
+function BodyPartCompareRow({ bodyPart, a, b }: { bodyPart: BodyPart; a: ComparisonDay | null; b: ComparisonDay | null }) {
+  const [open, setOpen] = useState(false);
+  const scoreA = scoreOf(a, bodyPart);
+  const scoreB = scoreOf(b, bodyPart);
+  const symptoms = SYMPTOM_ORDER.filter(
+    (symptom) => symptomScoreOf(a, bodyPart, symptom) !== null || symptomScoreOf(b, bodyPart, symptom) !== null,
+  );
+
+  return (
+    <div>
+      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="w-full text-left">
+        <CompareRow
+          label={
+            <span className="flex items-center gap-1.5">
+              {BODY_PART_LABELS[bodyPart]}
+              <span aria-hidden className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>
+                ▾
+              </span>
+            </span>
+          }
+          valueA={scoreText(scoreA)}
+          valueB={scoreText(scoreB)}
+          change={diff(scoreA, scoreB)}
+        />
+      </button>
+      {open && (
+        <div className="mb-2.5 flex flex-col divide-y divide-gray-100 rounded-lg bg-gray-50 px-3 text-sm">
+          {symptoms.map((symptom) => {
+            const symptomA = symptomScoreOf(a, bodyPart, symptom);
+            const symptomB = symptomScoreOf(b, bodyPart, symptom);
+            return (
+              <CompareRow
+                key={symptom}
+                label={SYMPTOM_LABELS[symptom]}
+                valueA={scoreText(symptomA)}
+                valueB={scoreText(symptomB)}
+                change={diff(symptomA, symptomB)}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -143,7 +177,7 @@ function CompareRow({
   valueB,
   change = null,
 }: {
-  label: string;
+  label: ReactNode;
   valueA: string | null;
   valueB: string | null;
   change?: number | null;

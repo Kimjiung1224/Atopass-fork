@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { PhotoRef, RecordInput, SkinCondition, SymptomKey } from '@/types/record';
 import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SCORE_MAX, SYMPTOM_LABELS } from '@/utils/constants';
-import { representativeScore } from '@/utils/recordScore';
+import { bodyPartScore, representativeScore } from '@/utils/recordScore';
 import SavedPhotoList from './SavedPhotoList';
 import Section from './Section';
 
@@ -36,15 +37,18 @@ export default function RecordView({ record, recordId, photos }: Props) {
         </div>
       </div>
 
-      <Section title="부위·증상">
+      <Section title="부위별 증상 점수">
         {record.skinConditions.length === 0 ? (
           <p className="text-gray-400">{EMPTY_TEXT}</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {record.skinConditions.map((condition) => (
-              <BodyPartCard key={condition.bodyPart} condition={condition} />
-            ))}
-          </div>
+          <>
+            <ul className="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-200 px-4">
+              {record.skinConditions.map((condition) => (
+                <BodyPartRow key={condition.bodyPart} condition={condition} />
+              ))}
+            </ul>
+            <p className="mt-2 text-sm text-gray-400">부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.</p>
+          </>
         )}
       </Section>
 
@@ -75,34 +79,62 @@ export default function RecordView({ record, recordId, photos }: Props) {
   );
 }
 
-/** 부위 하나: 기록한 증상만 점수 높은 순으로 막대와 함께 보여 준다 */
-function BodyPartCard({ condition }: { condition: SkinCondition }) {
+/** 점수 막대 */
+function ScoreBar({ score }: { score: number }) {
+  return (
+    <span className="h-2.5 overflow-hidden rounded-full bg-gray-100">
+      <span
+        className={`block h-full rounded-full ${scoreTone(score).bar}`}
+        style={{ width: `${(score / SCORE_MAX) * 100}%` }}
+      />
+    </span>
+  );
+}
+
+/** 부위 하나: 증상 평균을 한 줄로 보여 주고, 누르면 기록한 증상별 점수(높은 순)를 펼친다 */
+function BodyPartRow({ condition }: { condition: SkinCondition }) {
+  const [open, setOpen] = useState(false);
+  const score = bodyPartScore(condition);
   const symptoms = (Object.entries(condition.symptoms) as [SymptomKey, number | undefined][])
     .filter((entry): entry is [SymptomKey, number] => typeof entry[1] === 'number')
     .sort((a, b) => b[1] - a[1]);
 
+  if (score === null) {
+    return (
+      <li className="grid grid-cols-[4.5rem_1fr] items-center gap-3 py-3">
+        <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
+        <span className="text-gray-400">기록한 증상 없음</span>
+      </li>
+    );
+  }
+
   return (
-    <div className="rounded-xl border border-gray-200 p-4">
-      <h3 className="mb-3 font-bold">{BODY_PART_LABELS[condition.bodyPart]}</h3>
-      {symptoms.length === 0 ? (
-        <p className="text-gray-400">기록한 증상 없음</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {symptoms.map(([key, score]) => (
-            <li key={key} className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-3">
-              <span className="text-gray-700">{SYMPTOM_LABELS[key]}</span>
-              <span className="h-2.5 overflow-hidden rounded-full bg-gray-100">
-                <span
-                  className={`block h-full rounded-full ${scoreTone(score).bar}`}
-                  style={{ width: `${(score / SCORE_MAX) * 100}%` }}
-                />
-              </span>
-              <span className="text-right font-semibold">{score}점</span>
+    <li className="py-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="grid w-full grid-cols-[4.5rem_1fr_3rem_1rem] items-center gap-3 text-left"
+      >
+        <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
+        <ScoreBar score={score} />
+        <span className="text-right font-semibold">{score}점</span>
+        <span aria-hidden className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>
+          ▾
+        </span>
+      </button>
+      {open && (
+        <ul className="mt-3 flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm">
+          {symptoms.map(([key, value]) => (
+            <li key={key} className="grid grid-cols-[4rem_1fr_2.5rem] items-center gap-3">
+              <span className="text-gray-600">{SYMPTOM_LABELS[key]}</span>
+              <ScoreBar score={value} />
+              <span className="text-right text-gray-700">{value}점</span>
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </li>
   );
 }
 
