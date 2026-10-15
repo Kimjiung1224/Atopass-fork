@@ -52,8 +52,8 @@ function SleepDot({ cx, cy, index, payload }: DotProps) {
 }
 
 /**
- * 날짜별 수면 시간을 점으로 보여 준다. 권장 수면 시간(7~9시간)은 초록 띠로 깔고,
- * 범위를 벗어난 날은 점 색을 달리해 한눈에 보이게 한다.
+ * 날짜별 수면 시간 변화. 증상 그래프와 같이 선으로 잇고, 기록이 끊긴 구간만 점선으로 보인다.
+ * 권장 수면 시간(7~9시간)은 초록 띠로 깔고, 범위를 벗어난 날은 점 색을 달리해 한눈에 보이게 한다.
  */
 export default function SleepBarChart({ data, onBarClick }: Props) {
   const tooltip = ({ active, payload }: TooltipContentProps<ValueType, NameType>) => {
@@ -115,8 +115,21 @@ export default function SleepBarChart({ data, onBarClick }: Props) {
             <Tooltip content={tooltip} cursor={{ stroke: CHART.cursor }} />
             <Line
               dataKey="value"
-              stroke="none"
-              dot={SleepDot}
+              connectNulls
+              stroke={CHART.gap}
+              strokeWidth={2}
+              strokeDasharray="4 4"
+              dot={false}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+            <Line
+              dataKey="value"
+              stroke={CHART.line}
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              dot={data.length > 45 ? false : SleepDot}
               activeDot={{ r: 6, fill: CHART.line, stroke: CHART.surface, strokeWidth: 2 }}
               isAnimationActive={false}
             />
