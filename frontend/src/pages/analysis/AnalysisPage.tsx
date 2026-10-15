@@ -4,6 +4,7 @@ import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
 import SleepBarChart from '@/components/analysis/SleepBarChart';
 import TrendLineChart, { type TrendDatum } from '@/components/analysis/TrendLineChart';
+import { SCORE_TICKS } from '@/components/analysis/chartTheme';
 import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
@@ -133,6 +134,7 @@ export default function AnalysisPage() {
             <TrendLineChart
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
+              ticks={SCORE_TICKS}
               formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 증상 점수 ${v}점`)}
               onPointClick={openRecord}
               ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위별 증상 점수 변화 그래프'}
