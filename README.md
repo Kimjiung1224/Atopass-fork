@@ -45,6 +45,7 @@ CREATE DATABASE skinlog CHARACTER SET utf8mb4;
 | `ANTHROPIC_API_KEY` | | 없음 | 챗봇이 쓰는 Claude API 키. **없으면 챗봇만 503**(`CHATBOT_UNAVAILABLE`)이고 나머지 기능은 동작합니다. |
 | `LLM_MODEL` | | `claude-opus-5-5` | 챗봇 모델. 비용을 줄이려면 `claude-haiku-5-5` 등으로 바꿉니다. |
 | `LLM_EFFORT` | | `low` | 챗봇 응답 깊이 (`low`, `medium`, `high`, `xhigh`, `max`) |
+| `CHATBOT_DAILY_LIMIT` | | `100` | 회원 한 명이 최근 24시간 동안 보낼 수 있는 챗봇 메시지 수. 넘으면 429(`CHAT_LIMIT_EXCEEDED`). LLM 비용 보호용입니다. |
 | `COOKIE_SECURE` | | `true` | 리프레시 토큰 쿠키의 `Secure` 속성. Safari로 `http://localhost`에서 개발할 때만 `false` |
 | `CORS_ALLOWED_ORIGINS` | | `http://localhost:5173` | 허용할 프론트 주소 |
 | `REPORT_DIR` | | `./data/reports` | 보고서 PDF 저장 폴더. 웹으로 공개되는 경로 밖이어야 합니다. |

@@ -617,6 +617,7 @@ paths:
         - 입력한 문장을 해석하지 못하거나 점수 범위(0~10)를 벗어나면 오류가 아니라 `200`으로 같은 내용을 다시 묻고 `understood: false`를 내려준다. 3번 연속 실패하면 입력 예시를 안내한다.
         - `message`가 비었거나 500자를 넘으면 `400 INVALID_INPUT`.
         - 이미 기록을 저장해 닫힌 세션이면 `409 SESSION_CLOSED`.
+        - 최근 24시간 동안 보낸 메시지가 한도(기본 100회)에 도달하면 `429 CHAT_LIMIT_EXCEEDED`. LLM을 호출하기 전에 막고, 오래된 메시지가 24시간을 지나면 다시 쓸 수 있다. 프론트는 안내 문구를 보여주고 총정리 화면에서 직접 입력하도록 안내한다.
         - 챗봇 처리(외부 LLM 등) 장애는 `503 CHATBOT_UNAVAILABLE`. 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
       requestBody:
         required: true
@@ -652,6 +653,12 @@ paths:
           $ref: '#/components/responses/SessionNotFound'
         '409':
           description: 이미 기록을 저장해 닫힌 세션 (`SESSION_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 최근 24시간 챗봇 이용 한도 초과 (`CHAT_LIMIT_EXCEEDED`)
           content:
             application/json:
               schema:
@@ -992,7 +999,7 @@ components:
                 인증·회원: INVALID_CREDENTIALS, TOKEN_EXPIRED, EMAIL_DUPLICATED /
                 기록: RECORD_NOT_FOUND, RECORD_ALREADY_EXISTS, INVALID_SCORE_RANGE /
                 사진: INVALID_FILE_TYPE, FILE_TOO_LARGE, PHOTO_LIMIT_EXCEEDED /
-                챗봇: SESSION_NOT_FOUND, SESSION_CLOSED, CHATBOT_UNAVAILABLE, DRAFT_NOT_CONFIRMED, CONSENT_REQUIRED /
+                챗봇: SESSION_NOT_FOUND, SESSION_CLOSED, CHATBOT_UNAVAILABLE, DRAFT_NOT_CONFIRMED, CONSENT_REQUIRED, CHAT_LIMIT_EXCEEDED /
                 보고서: REPORT_NOT_FOUND, NO_RECORDS_IN_PERIOD
               example: RECORD_NOT_FOUND
             message:

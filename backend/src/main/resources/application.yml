@@ -35,6 +35,8 @@ app:
     effort: ${LLM_EFFORT:low}
     max-tokens: 2048
     timeout-seconds: 30
+    # 회원 한 명이 최근 24시간 동안 보낼 수 있는 챗봇 메시지 수. 넘으면 429 CHAT_LIMIT_EXCEEDED
+    daily-message-limit: ${CHATBOT_DAILY_LIMIT:100}
   storage:
     # 보고서 PDF/사진 저장 위치. 웹으로 공개되는 경로 밖이어야 한다.
     report-dir: ${REPORT_DIR:./data/reports}
