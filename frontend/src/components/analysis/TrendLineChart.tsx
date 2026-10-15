@@ -33,6 +33,22 @@ interface Props {
   ariaLabel: string;
 }
 
+/**
+ * 그래프를 누른 위치의 날짜 데이터.
+ * 고른 날이 없을 때 activeTooltipIndex가 null로 오는데, Number(null)이 0이 되어
+ * 첫날이 골라지던 문제가 있어 날짜(activeLabel)로 먼저 찾고 null은 걸러 낸다.
+ */
+export function datumFromClick(
+  data: TrendDatum[],
+  state: { activeLabel?: unknown; activeTooltipIndex?: unknown } | null | undefined,
+): TrendDatum | undefined {
+  const label = state?.activeLabel;
+  if (typeof label === 'string') return data.find((d) => d.date === label);
+  const index = state?.activeTooltipIndex;
+  if (index === null || index === undefined || index === '') return undefined;
+  return data[Number(index)];
+}
+
 /** 값이 가장 높은 날. 같은 값이면 앞선 날. */
 function findPeak(data: TrendDatum[]): TrendDatum | null {
   let peak: TrendDatum | null = null;
@@ -59,21 +75,20 @@ export default function TrendLineChart({ data, domain, ticks, formatValue, onPoi
         <p className={datum.value === null ? 'text-gray-400' : 'font-semibold text-gray-900'}>
           {datum.value === null ? EMPTY_TEXT : formatValue(datum.value)}
         </p>
-        {onPointClick && datum.recordId !== null && <p className="mt-0.5 text-gray-400">누르면 그날 기록을 볼 수 있어요</p>}
+        {onPointClick && datum.recordId !== null && <p className="mt-0.5 text-gray-400">누르면 아래에서 그날 기록을 볼 수 있어요</p>}
       </div>
     );
   };
 
   return (
-    <div className={`h-64 ${onPointClick ? 'cursor-pointer' : ''}`} role="img" aria-label={ariaLabel}>
+    <div className={`h-64 [&_*:focus:not(:focus-visible)]:outline-none ${onPointClick ? 'cursor-pointer' : ''}`} role="img" aria-label={ariaLabel}>
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={data}
           margin={{ top: 20, right: 12, bottom: 0, left: -20 }}
           onClick={(state) => {
-            // 점을 정확히 누르지 않아도 가장 가까운 날짜의 기록으로 이동한다.
-            const index = Number(state?.activeTooltipIndex);
-            const datum = Number.isInteger(index) ? data[index] : undefined;
+            // 점을 정확히 누르지 않아도 가장 가까운 날짜를 고른다.
+            const datum = datumFromClick(data, state);
             if (onPointClick && datum && datum.recordId !== null && datum.value !== null) onPointClick(datum);
           }}
         >

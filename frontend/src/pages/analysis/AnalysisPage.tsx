@@ -1,21 +1,20 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
+import PeriodInsights from '@/components/analysis/PeriodInsights';
+import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
 import SleepBarChart from '@/components/analysis/SleepBarChart';
 import TrendLineChart, { type TrendDatum } from '@/components/analysis/TrendLineChart';
 import { SCORE_TICKS } from '@/components/analysis/chartTheme';
 import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
-import type { AnalysisSummary } from '@/types/analysis';
 import type { BodyPart } from '@/types/record';
 import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
 import { today } from '@/utils/date';
 import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { bodyPartScoreOf, representativeScore } from '@/utils/recordScore';
-import { recordPath } from '@/utils/routes';
 
 type Period = '30' | '90' | 'ALL';
 type Tab = 'overall' | 'bodyPart' | 'sleep';
@@ -56,18 +55,20 @@ function toDailySeries(items: TrendDatum[], startDate: string, endDate: string, 
 }
 
 export default function AnalysisPage() {
-  const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overall');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
+  // 그래프에서 누른 날. 화면을 옮기지 않고 그래프 아래에 그날 기록을 보여 준다.
+  const [selected, setSelected] = useState<{ date: string; recordId: number } | null>(null);
 
   const range = useMemo(() => periodToRange(period), [period]);
   const isAll = period === 'ALL';
   const isBodyPartTab = tab === 'bodyPart';
 
-  const summary = useAsync(() => analysisApi.getSummary(range), [range]);
   // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
+  // 분석 요약: 그래프를 위로 올리고, 기록 부족 안내는 그래프 아래에, 인사이트는 접어서 그 아래에 둔다.
+  const summary = useAsync(() => analysisApi.getSummary(range), [range]);
 
   const series = useMemo(() => {
     const items = (records.data ?? []).map((r) => ({
@@ -84,17 +85,21 @@ export default function AnalysisPage() {
   }, [isBodyPartTab, tab, bodyPart, records.data, range, isAll]);
 
   const hasValue = series.some((d) => d.value !== null);
-  // 그래프 점을 누르면 그날의 총정리 화면으로 이동한다.
-  const openRecord = (datum: TrendDatum) => navigate(recordPath(datum.date));
+  const selectDay = (datum: TrendDatum) => {
+    if (datum.recordId !== null) setSelected({ date: datum.date, recordId: datum.recordId });
+  };
+  // 기간을 바꾸면 고른 날이 범위 밖일 수 있어 닫는다.
+  const changePeriod = (value: Period) => {
+    setPeriod(value);
+    setSelected(null);
+  };
 
   return (
     <>
       <PageHeader title="피부 변화" />
 
       <div className="flex flex-col gap-4 px-4 pt-4">
-        <SegmentedControl options={PERIODS} value={period} onChange={setPeriod} ariaLabel="기간" />
-
-        <SummaryBox summary={summary} />
+        <SegmentedControl options={PERIODS} value={period} onChange={changePeriod} ariaLabel="기간" />
 
         <section className="rounded-2xl border border-gray-200 p-4">
           <div role="tablist" aria-label="그래프 종류" className="mb-4 flex gap-1 border-b border-gray-100">
@@ -129,52 +134,40 @@ export default function AnalysisPage() {
           ) : !hasValue ? (
             <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
           ) : tab === 'sleep' ? (
-            <SleepBarChart data={series} onBarClick={openRecord} />
+            <SleepBarChart data={series} onBarClick={selectDay} />
           ) : (
             <TrendLineChart
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
               ticks={SCORE_TICKS}
               formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 증상 점수 ${v}점`)}
-              onPointClick={openRecord}
+              onPointClick={selectDay}
               ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위별 증상 점수 변화 그래프'}
             />
           )}
 
           {hasValue && !records.loading && !records.error && (
-            <p className="mt-3 text-sm text-gray-400">그래프를 누르면 그날의 기록을 볼 수 있어요.</p>
+            <p className="mt-3 text-sm text-gray-400">날짜를 누르면 그래프 아래에서 그날 기록을 볼 수 있어요.</p>
+          )}
+          {summary.data && !summary.data.availableForComparison && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              아직 기록이 부족해요 (이 기간 {summary.data.recordCount}일). 7일 이상 기록하면 피부 변화를 비교해 드릴게요.
+            </p>
           )}
         </section>
+
+        {summary.data?.availableForComparison && <PeriodInsights key={period} insights={summary.data.insights} />}
       </div>
-    </>
-  );
-}
 
-function SummaryBox({ summary }: { summary: { data?: AnalysisSummary; loading: boolean; error: unknown } }) {
-  if (summary.loading || !summary.data) {
-    return summary.error ? <p className="text-gray-400">분석 요약을 불러오지 못했어요.</p> : null;
-  }
-
-  const { availableForComparison, recordCount, insights } = summary.data;
-  if (!availableForComparison) {
-    return (
-      <div className="rounded-xl bg-amber-50 px-4 py-3 text-amber-800">
-        아직 기록이 부족해요 (이 기간 {recordCount}일). 7일 이상 기록하면 피부 변화를 비교해 드릴게요.
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl bg-emerald-50 px-4 py-3 text-emerald-800">
-      <p className="font-bold">이 기간에 {recordCount}일 기록했어요.</p>
-      {insights.length > 0 && (
-        <ul className="mt-2 flex list-disc flex-col gap-1 pl-5">
-          {insights.map((insight, i) => (
-            <li key={`${insight.type}-${i}`}>{insight.message}</li>
-          ))}
-        </ul>
+      {selected && (
+        <SelectedDayRecord
+          key={selected.recordId}
+          date={selected.date}
+          recordId={selected.recordId}
+          onClose={() => setSelected(null)}
+        />
       )}
-    </div>
+    </>
   );
 }
 
