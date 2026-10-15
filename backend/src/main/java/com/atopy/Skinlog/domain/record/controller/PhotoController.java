@@ -1,6 +1,6 @@
 package com.atopy.Skinlog.domain.record.controller;
 
-import com.atopy.Skinlog.domain.record.dto.response.PhotoSummary;
+import com.atopy.Skinlog.domain.record.dto.response.PhotoUploaded;
 import com.atopy.Skinlog.domain.record.service.PhotoContent;
 import com.atopy.Skinlog.domain.record.service.PhotoService;
 import com.atopy.Skinlog.global.response.ApiResponse;
@@ -26,10 +26,10 @@ public class PhotoController {
 	private final PhotoService photoService;
 
 	@PostMapping
-	public ResponseEntity<ApiResponse<PhotoSummary>> upload(
+	public ResponseEntity<ApiResponse<PhotoUploaded>> upload(
 		@CurrentMember Long memberId, @PathVariable Long recordId, @RequestParam MultipartFile file) {
-		PhotoSummary summary = photoService.upload(memberId, recordId, file);
-		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(summary, "사진이 업로드되었습니다."));
+		PhotoUploaded uploaded = photoService.upload(memberId, recordId, file);
+		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(uploaded, "사진이 업로드되었습니다."));
 	}
 
 	@GetMapping("/{photoId}")

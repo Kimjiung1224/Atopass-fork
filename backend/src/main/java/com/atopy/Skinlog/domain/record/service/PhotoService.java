@@ -1,6 +1,6 @@
 package com.atopy.Skinlog.domain.record.service;
 
-import com.atopy.Skinlog.domain.record.dto.response.PhotoSummary;
+import com.atopy.Skinlog.domain.record.dto.response.PhotoUploaded;
 import com.atopy.Skinlog.domain.record.entity.Photo;
 import com.atopy.Skinlog.domain.record.entity.PhotoType;
 import com.atopy.Skinlog.domain.record.entity.SkinRecord;
@@ -33,7 +33,7 @@ public class PhotoService {
 	private final PhotoStorage photoStorage;
 
 	@Transactional
-	public PhotoSummary upload(Long memberId, Long recordId, MultipartFile file) {
+	public PhotoUploaded upload(Long memberId, Long recordId, MultipartFile file) {
 		findOwnedRecord(memberId, recordId);
 
 		if (photoRepository.countByRecordId(recordId) >= MAX_PHOTOS_PER_RECORD) {
@@ -52,7 +52,7 @@ public class PhotoService {
 			.contentType(type.contentType())
 			.size(content.length)
 			.build();
-		return PhotoSummary.from(photoRepository.save(photo));
+		return PhotoUploaded.from(photoRepository.save(photo));
 	}
 
 	public PhotoContent getContent(Long memberId, Long recordId, Long photoId) {

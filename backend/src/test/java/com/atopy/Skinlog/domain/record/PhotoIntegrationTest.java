@@ -40,6 +40,7 @@ class PhotoIntegrationTest extends ApiTestSupport {
 		String response = mockMvc.perform(photoUpload(recordId, bearer, JPEG_BYTES, "photo.jpg"))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.data.photoId").isNumber())
+			.andExpect(jsonPath("$.data.recordId").value(recordId))
 			.andReturn().getResponse().getContentAsString();
 		long photoId = jsonMapper.readTree(response).get("data").get("photoId").asLong();
 
