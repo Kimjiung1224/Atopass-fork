@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
+import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
+import PeriodInsights from '@/components/analysis/PeriodInsights';
 import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
 import SleepBarChart from '@/components/analysis/SleepBarChart';
 import TrendLineChart, { type TrendDatum } from '@/components/analysis/TrendLineChart';
+import { SCORE_TICKS } from '@/components/analysis/chartTheme';
 import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
@@ -64,6 +67,8 @@ export default function AnalysisPage() {
 
   // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
+  // 분석 요약: 그래프를 위로 올리고, 기록 부족 안내는 그래프 아래에, 인사이트는 접어서 그 아래에 둔다.
+  const summary = useAsync(() => analysisApi.getSummary(range), [range]);
 
   const series = useMemo(() => {
     const items = (records.data ?? []).map((r) => ({
@@ -134,6 +139,7 @@ export default function AnalysisPage() {
             <TrendLineChart
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
+              ticks={SCORE_TICKS}
               formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 증상 점수 ${v}점`)}
               onPointClick={selectDay}
               ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위별 증상 점수 변화 그래프'}
@@ -143,7 +149,14 @@ export default function AnalysisPage() {
           {hasValue && !records.loading && !records.error && (
             <p className="mt-3 text-sm text-gray-400">날짜를 누르면 그래프 아래에서 그날 기록을 볼 수 있어요.</p>
           )}
+          {summary.data && !summary.data.availableForComparison && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              아직 기록이 부족해요 (이 기간 {summary.data.recordCount}일). 7일 이상 기록하면 피부 변화를 비교해 드릴게요.
+            </p>
+          )}
         </section>
+
+        {summary.data?.availableForComparison && <PeriodInsights key={period} insights={summary.data.insights} />}
       </div>
 
       {selected && (

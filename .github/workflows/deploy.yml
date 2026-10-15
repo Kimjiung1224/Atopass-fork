@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE: ghcr.io/sinjuno/skinlog
+  IMAGE: ghcr.io/sinjuno/atopass
 
 jobs:
   test:
@@ -97,7 +97,7 @@ jobs:
         run: |
           scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
             deploy/docker-compose.yml deploy/Caddyfile deploy/backup.sh \
-            "$DEPLOY_USER@$DEPLOY_HOST:/opt/skinlog/"
+            "$DEPLOY_USER@$DEPLOY_HOST:/opt/atopass/"
 
       - name: 배포 (백업 → 새 이미지로 교체)
         env:
@@ -107,7 +107,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" "
             set -e
-            cd /opt/skinlog
+            cd /opt/atopass
             chmod +x backup.sh
             ./backup.sh || echo '백업을 건너뜁니다(첫 배포이거나 DB가 아직 없음)'
             export APP_TAG=$APP_TAG

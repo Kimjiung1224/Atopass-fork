@@ -37,7 +37,7 @@ export default function ReportPreview({ report }: { report: Report }) {
     };
   }, [report.reportId, reloadKey]);
 
-  const fileName = `skinlog-report_${report.startDate}_${report.endDate}.pdf`;
+  const fileName = `atopass-report_${report.startDate}_${report.endDate}.pdf`;
 
   return (
     <div>

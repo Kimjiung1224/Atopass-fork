@@ -24,18 +24,6 @@ export function bodyPartScore(condition: SkinCondition | undefined): number | nu
   return Math.round(average * 10) / 10;
 }
 
-/**
- * 그날의 평균 증상 점수: 부위별 증상 점수(증상 평균)를 다시 평균 낸 값 (소수점 첫째 자리 반올림).
- * 증상을 많이 적은 부위에 치우치지 않도록 부위마다 같은 무게로 센다.
- * 증상을 기록한 부위가 없으면 null.
- */
-export function averageScore(skinConditions: SkinCondition[] | undefined): number | null {
-  const scores = (skinConditions ?? []).map(bodyPartScore).filter((score): score is number => score !== null);
-  if (!scores.length) return null;
-  const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  return Math.round(average * 10) / 10;
-}
-
 /** 기록 중 해당 부위의 증상 점수. 그 부위를 기록하지 않았으면 null */
 export function bodyPartScoreOf(skinConditions: SkinCondition[] | undefined, bodyPart: BodyPart): number | null {
   return bodyPartScore(skinConditions?.find((condition) => condition.bodyPart === bodyPart));

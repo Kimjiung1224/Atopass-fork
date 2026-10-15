@@ -105,7 +105,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center p-6">
       <div className="mb-8 text-center">
-        <p className="text-3xl font-extrabold text-emerald-600">Skinlog</p>
+        <p className="text-3xl font-extrabold text-emerald-600">Atopass</p>
         <p className="mt-2 text-gray-500">매일의 피부 기록을 쉽고 꾸준하게</p>
       </div>
 
