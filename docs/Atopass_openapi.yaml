@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 아토피 피부 기록 서비스 API
+  title: Atopass API (아토피 피부 기록 서비스)
   version: 1.0.0
   description: |
     아토피 피부 변화를 기록하고, 기록을 분석하며, 진료 참고용 보고서를 만드는 서비스의 API.

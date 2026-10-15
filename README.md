@@ -1,6 +1,6 @@
-# Skinlog
+# Atopass
 
-아토피 피부염 환자가 매일의 피부 상태를 기록하고, 쌓인 기록으로 변화를 확인하고, 진료 때 참고할 수 있는 문서(PDF)로 정리하는 서비스입니다.
+Atopass는 아토피 피부염 환자가 매일의 피부 상태를 기록하고, 쌓인 기록으로 변화를 확인하고, 진료 때 참고할 수 있는 문서(PDF)로 정리하는 서비스입니다.
 
 - 챗봇과 대화하며 하루 기록을 입력하고, 확인한 뒤 저장합니다. (챗봇은 외부 AI(Claude)를 사용하므로 **처음 쓸 때 이용 동의**가 필요합니다.)
 - 부위별 증상 점수(0~10), 수면, 생활습관, 사진, 특이사항을 날짜별로 기록합니다. 기록은 하루 1건입니다.
@@ -14,7 +14,7 @@
 |---|---|
 | `backend/` | Spring Boot 4 · Java 21 · JPA · MySQL · JWT 인증 |
 | `frontend/` | React 19 · TypeScript · Vite · Tailwind |
-| `docs/` | API 명세(`Skinlog_openapi.yaml`), ERD(`Skinlog_erd.dbml`) |
+| `docs/` | API 명세(`Atopass_openapi.yaml`), ERD(`Atopass_erd.dbml`) |
 
 ## 로컬에서 실행하기
 
@@ -27,7 +27,7 @@
 MySQL에 데이터베이스를 만들어 둡니다.
 
 ```sql
-CREATE DATABASE skinlog CHARACTER SET utf8mb4;
+CREATE DATABASE atopass CHARACTER SET utf8mb4;
 ```
 
 테이블은 서버가 처음 뜰 때 자동으로 만들어집니다(`JPA_DDL_AUTO=update`).
@@ -39,7 +39,7 @@ CREATE DATABASE skinlog CHARACTER SET utf8mb4;
 | 이름 | 필수 | 기본값 | 설명 |
 |---|---|---|---|
 | `JWT_SECRET` | 필수 | 없음 | 로그인 토큰 서명 키. **32바이트 이상**이어야 서버가 뜹니다. |
-| `DB_URL` | | `jdbc:mysql://localhost:3306/skinlog?serverTimezone=Asia/Seoul&characterEncoding=UTF-8` | DB 주소 |
+| `DB_URL` | | `jdbc:mysql://localhost:3306/atopass?serverTimezone=Asia/Seoul&characterEncoding=UTF-8` | DB 주소 |
 | `DB_USERNAME` | | `root` | DB 계정 |
 | `DB_PASSWORD` | | (빈 값) | DB 비밀번호 |
 | `ANTHROPIC_API_KEY` | | 없음 | 챗봇이 쓰는 Claude API 키. **없으면 챗봇만 503**(`CHATBOT_UNAVAILABLE`)이고 나머지 기능은 동작합니다. |
@@ -84,8 +84,8 @@ cd frontend && npm run build     # 타입 검사(tsc)와 빌드
 
 ## 문서
 
-- API 명세: `docs/Skinlog_openapi.yaml` — [Swagger Editor](https://editor.swagger.io/)에 붙여넣거나 Swagger UI로 볼 수 있습니다. 프론트와 백엔드의 약속(계약)이므로, 필드를 바꿀 때는 코드보다 먼저 이 파일을 고칩니다.
-- ERD: `docs/Skinlog_erd.dbml` — [dbdiagram.io](https://dbdiagram.io/)에 붙여넣으면 그림으로 보입니다.
+- API 명세: `docs/Atopass_openapi.yaml` — [Swagger Editor](https://editor.swagger.io/)에 붙여넣거나 Swagger UI로 볼 수 있습니다. 프론트와 백엔드의 약속(계약)이므로, 필드를 바꿀 때는 코드보다 먼저 이 파일을 고칩니다.
+- ERD: `docs/Atopass_erd.dbml` — [dbdiagram.io](https://dbdiagram.io/)에 붙여넣으면 그림으로 보입니다.
 - 배포: [`docs/DEPLOY.md`](docs/DEPLOY.md) — Oracle 무료 VM + Docker로 올리는 방법과, `main` 머지 시 자동 배포되는 흐름
 
 ## 개발 규칙

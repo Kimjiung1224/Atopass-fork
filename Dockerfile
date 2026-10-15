@@ -20,15 +20,15 @@ RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 COPY backend/src src
 COPY --from=web /web/dist src/main/resources/static
 RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon bootJar -x test \
-    && cp build/libs/service-*.jar /app.jar
+    && cp "$(find build/libs -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' | head -n 1)" /app.jar
 
 # 3) 실행 이미지
 FROM eclipse-temurin:21-jre
-RUN useradd --system --uid 10001 --create-home skinlog \
-    && mkdir -p /data && chown skinlog /data
+RUN useradd --system --uid 10001 --create-home atopass \
+    && mkdir -p /data && chown atopass /data
 WORKDIR /app
 COPY --from=api /app.jar app.jar
-USER skinlog
+USER atopass
 ENV TZ=Asia/Seoul \
     JAVA_OPTS="-XX:MaxRAMPercentage=65 -Djava.awt.headless=true"
 EXPOSE 8080

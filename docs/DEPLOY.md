@@ -27,7 +27,7 @@ VM에서는 앱, MySQL, HTTPS(Caddy) 세 개가 `docker compose`로 같이 돌�
 
 1. AWS 콘솔 오른쪽 위에서 리전을 **서울(ap-northeast-2)**로 고릅니다.
 2. **EC2 → Launch instance**
-   - 이름: `skinlog`
+   - 이름: `atopass`
    - 이미지(AMI): **Ubuntu Server 24.04 LTS**
    - 인스턴스 유형: **t3.small**(메모리 2GB, 일반 x86) 또는 **t4g.small**(2GB, ARM, 조금 더 저렴). 이 서비스는 앱(자바)과 MySQL을 같이 돌리므로 **메모리 1GB짜리(t3.micro, t4g.micro)는 부족해서 권장하지 않습니다.**
    - 키 페어: **새로 만들기(.pem)**. 개인키 파일을 안전한 곳에 보관합니다. (분실하면 접속할 수 없습니다)
@@ -70,7 +70,7 @@ sudo netfilter-persistent save
 ## 3. 도메인 연결
 
 도메인 관리 화면에서 **A 레코드**를 만들어 VM의 공용 IP로 연결합니다.
-(예: `skinlog.example.com` → `123.45.67.89`) 반영에 몇 분~수 시간이 걸릴 수 있습니다.
+(예: `atopass.example.com` → `123.45.67.89`) 반영에 몇 분~수 시간이 걸릴 수 있습니다.
 HTTPS 인증서는 도메인이 VM을 가리키면 Caddy가 자동으로 발급합니다.
 
 ## 4. VM 초기 설정 (한 번만)
@@ -84,7 +84,7 @@ VM에서 Docker를 설치하고 작업 폴더를 만듭니다.
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER        # 적용하려면 한 번 로그아웃했다가 다시 접속
-sudo mkdir -p /opt/skinlog && sudo chown $USER /opt/skinlog
+sudo mkdir -p /opt/atopass && sudo chown $USER /opt/atopass
 ```
 
 메모리가 2GB인 서버에서는 순간적인 부족(PDF 생성 등)에 대비해 **스왑 2GB**를 추가합니다. (Oracle 12GB 서버는 생략해도 됩니다)
@@ -96,12 +96,12 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 
 설정 파일(`.env`)을 만듭니다. 비밀값은 **이 파일에만** 적고, 저장소나 메신저에 올리지 않습니다.
 ```bash
-cd /opt/skinlog
+cd /opt/atopass
 nano .env
 ```
 내용은 저장소의 `deploy/.env.example`을 보고 채웁니다.
 ```
-DOMAIN=skinlog.example.com
+DOMAIN=atopass.example.com
 JWT_SECRET=<openssl rand -base64 48 로 만든 값>
 DB_PASSWORD=<openssl rand -base64 24 로 만든 값>
 MYSQL_ROOT_PASSWORD=<openssl rand -base64 24 로 만든 값>
@@ -122,7 +122,7 @@ echo <토큰> | docker login ghcr.io -u <GitHub 아이디> --password-stdin
 
 **① 배포 전용 SSH 키 만들기** (내 PC에서. 비밀번호 없이 만든 새 키)
 ```bash
-ssh-keygen -t ed25519 -f deploy_key -N "" -C "skinlog-deploy"
+ssh-keygen -t ed25519 -f deploy_key -N "" -C "atopass-deploy"
 ```
 - `deploy_key.pub` 내용을 VM의 `~/.ssh/authorized_keys` 맨 아랫줄에 추가합니다.
 - `deploy_key`(개인키)는 다음 단계에서 GitHub에만 넣고, 이후 PC에서 지웁니다.
@@ -141,7 +141,7 @@ ssh-keyscan -t ed25519 <VM 공용 IP>
 | `DEPLOY_USER` | `ubuntu` |
 | `DEPLOY_SSH_KEY` | `deploy_key` 파일 내용 전체 |
 | `DEPLOY_KNOWN_HOSTS` | ②에서 복사한 한 줄 |
-| `DEPLOY_DOMAIN` | `skinlog.example.com` (https:// 없이) |
+| `DEPLOY_DOMAIN` | `atopass.example.com` (https:// 없이) |
 
 ## 6. 첫 배포
 
@@ -158,7 +158,7 @@ ssh-keyscan -t ed25519 <VM 공용 IP>
 
 **되돌리기:** 문제가 생기면 VM에서 이전 버전(커밋 해시)으로 되돌립니다.
 ```bash
-cd /opt/skinlog
+cd /opt/atopass
 APP_TAG=<이전 커밋 해시 전체> docker compose up -d
 ```
 (GitHub의 Packages 화면이나 Actions 기록에서 이전 커밋 해시를 확인합니다.)
@@ -169,17 +169,17 @@ APP_TAG=<이전 커밋 해시 전체> docker compose up -d
 ```bash
 crontab -e
 # 아래 한 줄 추가 (매일 새벽 4시)
-0 4 * * * /opt/skinlog/backup.sh >> /opt/skinlog/backup.log 2>&1
+0 4 * * * /opt/atopass/backup.sh >> /opt/atopass/backup.log 2>&1
 ```
-백업 파일은 `/opt/skinlog/backups`에 14일 동안 보관됩니다. **이 폴더는 같은 VM 안에 있으니, 중요한 시점에는 내 PC로 내려받아 두세요.**
+백업 파일은 `/opt/atopass/backups`에 14일 동안 보관됩니다. **이 폴더는 같은 VM 안에 있으니, 중요한 시점에는 내 PC로 내려받아 두세요.**
 ```bash
-scp -i <키파일> ubuntu@<VM 공용 IP>:/opt/skinlog/backups/db-*.sql.gz ./
+scp -i <키파일> ubuntu@<VM 공용 IP>:/opt/atopass/backups/db-*.sql.gz ./
 ```
 
 DB 복구 예시:
 ```bash
-cd /opt/skinlog
-gunzip -c backups/db-<시각>.sql.gz | docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" skinlog'
+cd /opt/atopass
+gunzip -c backups/db-<시각>.sql.gz | docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" atopass'
 ```
 
 ## 9. 자주 막히는 곳
@@ -194,7 +194,7 @@ gunzip -c backups/db-<시각>.sql.gz | docker compose exec -T mysql sh -c 'mysql
 | 챗봇만 안 됨 | `ANTHROPIC_API_KEY`, Anthropic 크레딧 잔액 |
 | 로그인이 계속 풀림 | 주소가 `https://`인지 확인 (쿠키가 HTTPS에서만 동작) |
 
-로그 보기: `cd /opt/skinlog && docker compose logs -f app`
+로그 보기: `cd /opt/atopass && docker compose logs -f app`
 
 ## 10. 알아둘 점
 
