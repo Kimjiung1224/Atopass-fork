@@ -2,7 +2,14 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ComparisonDay, ComparisonResponse } from '@/types/analysis';
 import type { BodyPart, SymptomKey } from '@/types/record';
-import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SYMPTOM_LABELS } from '@/utils/constants';
+import {
+  BODY_PART_LABELS,
+  EMPTY_TEXT,
+  OUTDOOR_ACTIVITY_LABELS,
+  SKIN_SIGN_LABELS,
+  SLEEP_SCORE_MAX,
+  SYMPTOM_LABELS,
+} from '@/utils/constants';
 import { formatKoreanDate } from '@/utils/date';
 import { bodyPartScoreOf } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
@@ -51,6 +58,17 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
         <p className="rounded-2xl bg-gray-50 py-8 text-center text-gray-400">두 날짜 모두 기록이 없어요.</p>
       ) : (
         <>
+          <CompareSection title="오늘의 상태">
+            <CompareRow
+              label="고통 지수"
+              valueA={scoreText(a?.painIndex ?? null)}
+              valueB={scoreText(b?.painIndex ?? null)}
+              change={diff(a?.painIndex ?? null, b?.painIndex ?? null)}
+            />
+            <CompareRow label="약 복용" valueA={medicationText(a)} valueB={medicationText(b)} />
+            <CompareRow label="나타난 증상" valueA={skinSignsText(a)} valueB={skinSignsText(b)} />
+          </CompareSection>
+
           <CompareSection title="부위별 증상 점수" hint="부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.">
             {rows.length === 0 ? (
               <p className="py-2 text-center text-gray-400">{EMPTY_TEXT}</p>
@@ -61,6 +79,12 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
 
           <CompareSection title="수면·생활">
             <CompareRow label="수면" valueA={sleepText(a)} valueB={sleepText(b)} />
+            <CompareRow
+              label={`수면 점수 (${SLEEP_SCORE_MAX}점 만점)`}
+              valueA={scoreText(a?.sleepScore ?? null)}
+              valueB={scoreText(b?.sleepScore ?? null)}
+              change={diff(a?.sleepScore ?? null, b?.sleepScore ?? null)}
+            />
             <CompareRow label="음주" valueA={alcoholText(a)} valueB={alcoholText(b)} />
             <CompareRow label="외출" valueA={outdoorText(a)} valueB={outdoorText(b)} />
           </CompareSection>
@@ -85,6 +109,11 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
 }
 
 const sleepText = (day: ComparisonDay | null) => (day?.sleepHours == null ? null : `${day.sleepHours}시간`);
+const medicationText = (day: ComparisonDay | null) =>
+  day?.medication == null ? null : day.medication ? '복용했어요' : '안 했어요';
+/** 나타난 증상 이름을 나열한다. 기록이 없거나 빈 목록이면 null("기록 없음") */
+const skinSignsText = (day: ComparisonDay | null) =>
+  day?.skinSigns?.length ? day.skinSigns.map((sign) => SKIN_SIGN_LABELS[sign]).join(', ') : null;
 const alcoholText = (day: ComparisonDay | null) => {
   const alcohol = day?.lifestyle?.alcohol;
   return alcohol == null ? null : alcohol ? '했어요' : '안 했어요';
