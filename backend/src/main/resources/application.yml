@@ -14,6 +14,10 @@ spring:
         default_batch_fetch_size: 100
         jdbc:
           time_zone: Asia/Seoul
+  web:
+    resources:
+      # 화면(정적 파일)은 WebConfig에서 직접 서빙한다. (index.html 대체 응답 포함)
+      add-mappings: false
   servlet:
     multipart:
       max-file-size: 10MB
