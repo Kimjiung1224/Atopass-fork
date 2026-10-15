@@ -12,6 +12,7 @@ import com.atopy.Atopass.domain.record.dto.response.RecordPageResponse;
 import com.atopy.Atopass.domain.record.dto.response.RecordSummaryResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.SkinRecord;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.Symptom;
 import com.atopy.Atopass.domain.record.event.RecordDeletedEvent;
 import com.atopy.Atopass.domain.record.repository.PhotoRepository;
@@ -22,8 +23,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -56,12 +59,15 @@ public class RecordService {
 		SkinRecord record = SkinRecord.builder()
 			.member(member)
 			.recordDate(request.recordDate())
+			.painIndex(request.painIndex())
 			.sleepHours(scale(request.sleepHours()))
+			.medication(request.medication())
 			.alcohol(lifestyle == null ? null : lifestyle.alcohol())
 			.outdoorActivity(lifestyle == null ? null : lifestyle.outdoorActivity())
 			.notes(blankToNull(request.notes()))
 			.build();
 		record.replaceConditions(toConditions(request));
+		record.replaceSkinSigns(toSkinSigns(request));
 		try {
 			return RecordCreatedResponse.from(recordRepository.saveAndFlush(record));
 		} catch (DataIntegrityViolationException e) {
@@ -98,11 +104,14 @@ public class RecordService {
 		LifestyleRequest lifestyle = request.lifestyle();
 		record.update(
 			request.recordDate(),
+			request.painIndex(),
 			scale(request.sleepHours()),
+			request.medication(),
 			lifestyle == null ? null : lifestyle.alcohol(),
 			lifestyle == null ? null : lifestyle.outdoorActivity(),
 			blankToNull(request.notes()));
 		record.replaceConditions(toConditions(request));
+		record.replaceSkinSigns(toSkinSigns(request));
 		try {
 			recordRepository.flush();
 		} catch (DataIntegrityViolationException e) {
@@ -126,10 +135,21 @@ public class RecordService {
 
 	private Map<BodyPart, Map<Symptom, Integer>> toConditions(RecordRequest request) {
 		Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
+		if (request.skinConditions() == null) {
+			return conditions;
+		}
 		for (SkinConditionRequest condition : request.skinConditions()) {
 			conditions.put(condition.bodyPart(), condition.symptoms().toScores());
 		}
 		return conditions;
+	}
+
+	private Set<SkinSign> toSkinSigns(RecordRequest request) {
+		Set<SkinSign> signs = EnumSet.noneOf(SkinSign.class);
+		if (request.skinSigns() != null) {
+			signs.addAll(request.skinSigns());
+		}
+		return signs;
 	}
 
 	private RecordDetailResponse toDetail(SkinRecord record) {
