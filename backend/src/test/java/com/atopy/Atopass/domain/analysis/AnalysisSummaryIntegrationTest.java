@@ -67,6 +67,41 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 고통_지수가_평소보다_크게_오른_구간도_알려준다() throws Exception {
+		String bearer = newMemberBearer();
+		// 부위별 점수 없이 고통 지수만 기록: 6일은 2점, 마지막 이틀은 9점
+		for (int day = 0; day < 8; day++) {
+			createPainRecord(bearer, START.plusDays(day), day >= 6 ? 9 : 2);
+		}
+
+		mockMvc.perform(summary(bearer, START, START.plusDays(30)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.availableForComparison").value(true))
+			.andExpect(jsonPath("$.data.insights.length()").value(1))
+			.andExpect(jsonPath("$.data.insights[0].type").value("PAIN_INDEX_CHANGE"))
+			.andExpect(jsonPath("$.data.insights[0].direction").value("HIGH"))
+			.andExpect(jsonPath("$.data.insights[0].startDate").value("2026-03-07"))
+			.andExpect(jsonPath("$.data.insights[0].endDate").value("2026-03-08"))
+			.andExpect(jsonPath("$.data.insights[0].message")
+				.value("고통 지수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
+	}
+
+	@Test
+	void 고통_지수가_0인_날도_변화_분석에_포함한다() throws Exception {
+		String bearer = newMemberBearer();
+		// 0은 증상 없음이라는 값이다. 기록하지 않은 날로 빠지면 평균과 구간이 달라진다.
+		for (int day = 0; day < 8; day++) {
+			createPainRecord(bearer, START.plusDays(day), day >= 6 ? 8 : 0);
+		}
+
+		mockMvc.perform(summary(bearer, START, START.plusDays(30)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.insights[0].type").value("PAIN_INDEX_CHANGE"))
+			.andExpect(jsonPath("$.data.insights[0].message")
+				.value("고통 지수가 평소(평균 2.0)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
+	}
+
+	@Test
 	void 변화가_없으면_충분한_기록이_있어도_인사이트가_없다() throws Exception {
 		String bearer = newMemberBearer();
 		for (int day = 0; day < 8; day++) {
@@ -124,6 +159,14 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 		String bearer, LocalDate start, LocalDate end) {
 		return get("/api/v1/analysis/summary").header(AUTH, bearer)
 			.param("startDate", start.toString()).param("endDate", end.toString());
+	}
+
+	private void createPainRecord(String bearer, LocalDate date, int painIndex) throws Exception {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", date.toString());
+		body.put("painIndex", painIndex);
+		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated());
 	}
 
 	private void createRecord(String bearer, LocalDate date, int itching) throws Exception {

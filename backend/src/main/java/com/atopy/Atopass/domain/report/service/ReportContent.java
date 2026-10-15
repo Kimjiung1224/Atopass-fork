@@ -2,6 +2,7 @@ package com.atopy.Atopass.domain.report.service;
 
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.Symptom;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,7 +28,7 @@ record ReportContent(
 	LifestyleSummary lifestyle
 ) {
 
-	/** 같은 부위·증상이 직전 기록보다 크게 오른 것 */
+	/** 같은 부위·증상(또는 고통 지수)이 직전 기록보다 크게 오른 것. 고통 지수이면 bodyPart와 symptom이 null이다. */
 	record ScoreJump(
 		BodyPart bodyPart,
 		Symptom symptom,
@@ -57,8 +58,21 @@ record ReportContent(
 		Boolean alcohol,
 		OutdoorActivity outdoorActivity,
 		String notes,
-		List<ReportPhoto> photos
+		List<ReportPhoto> photos,
+		/** 고통 지수 0~10. 기록하지 않았으면 null */
+		Integer painIndex,
+		/** 약 복용 여부. 기록하지 않았으면 null */
+		Boolean medication,
+		/** 나타난 증상. 없으면 빈 목록 */
+		List<SkinSign> skinSigns
 	) {
+
+		/** 고통 지수·약 복용·나타난 증상이 없는 하루 기록 */
+		DayEntry(LocalDate date, Map<BodyPart, Map<Symptom, Integer>> conditions, BigDecimal sleepHours,
+			Boolean alcohol, OutdoorActivity outdoorActivity, String notes, List<ReportPhoto> photos) {
+			this(date, conditions, sleepHours, alcohol, outdoorActivity, notes, photos, null, null, List.of());
+		}
+
 	}
 
 	/** 기간 내 수면·생활 기록 요약. 기록한 날만 센다. 특이점을 평소와 비교하는 기준으로 쓴다. */

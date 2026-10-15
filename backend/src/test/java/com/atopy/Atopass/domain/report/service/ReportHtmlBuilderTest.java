@@ -2,9 +2,15 @@ package com.atopy.Atopass.domain.report.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.atopy.Atopass.domain.record.entity.BodyPart;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
+import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
@@ -35,6 +41,32 @@ class ReportHtmlBuilderTest {
 		factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
 		factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
 		factory.newDocumentBuilder().parse(new InputSource(new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8))));
+	}
+
+	@Test
+	void 고통_지수_요약과_심해진_날의_약_복용_나타난_증상을_보여_준다() {
+		LocalDate start = LocalDate.of(2026, 3, 1);
+		List<DayEntry> days = List.of(
+			new DayEntry(start, new EnumMap<>(BodyPart.class), null, null, null, null, List.of(), 0, null, List.of()),
+			new DayEntry(start.plusDays(1), new EnumMap<>(BodyPart.class), null, null, null, null, List.of(), 7,
+				true, List.of(SkinSign.XEROSIS, SkinSign.EXCORIATION)));
+		ReportContent content = new ReportContent(start, start.plusDays(30), start.plusDays(31), 2, false,
+			ReportContentFactory.flareDays(days), days, new ReportContent.LifestyleSummary(null, 0, 0, 0, Map.of()));
+
+		String html = builder.build(content);
+
+		assertThat(html)
+			// 0도 기록한 값이므로 평균에 들어간다: (0 + 7) / 2
+			.contains("고통 지수 (기간 평균·최고)").contains("평균 3.5 · 최고 7 (2일 기록)")
+			.contains("고통 지수 <b>0점 → 7점</b>")
+			.contains("약 복용").contains("나타난 증상 피부건조증, 긁은 자국");
+	}
+
+	@Test
+	void 고통_지수를_기록한_날이_없으면_고통_지수_행을_넣지_않는다() {
+		String html = builder.build(ReportSamples.content(false, "메모", List.of()));
+
+		assertThat(html).doesNotContain("고통 지수 (기간 평균·최고)");
 	}
 
 	@Test

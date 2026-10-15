@@ -31,6 +31,16 @@ Enum symptom {
   pain      [note: '통증']
 }
 
+Enum skin_sign {
+  XEROSIS         [note: '피부건조증']
+  ERYTHEMA        [note: '홍반']
+  SCALING         [note: '각질']
+  PAPULE          [note: '구진']
+  EXCORIATION     [note: '긁은 자국']
+  NODULE          [note: '결절']
+  LICHENIFICATION [note: '태선화']
+}
+
 Enum outdoor_activity {
   LOW
   MEDIUM
@@ -78,7 +88,9 @@ Table records {
   id bigint [pk, increment]
   member_id bigint [not null]
   record_date date [not null, note: '기록 날짜. 하루 1건']
-  sleep_hours decimal(3,1) [null, note: '미기록은 null']
+  pain_index int [null, note: '고통 지수 0~10. 0은 없음이며 기록한 값. 미기록은 null. 주관적 강도이며 의료적 중증도가 아니다']
+  sleep_hours decimal(3,1) [null, note: '미기록은 null. 수면 점수(1~5)는 저장하지 않고 수면 시간으로 계산한다']
+  medication boolean [null, note: '약 복용 여부. 미기록은 null']
   alcohol boolean [null, note: '미기록은 null']
   outdoor_activity outdoor_activity [null, note: '미기록은 null']
   notes text [null, note: '특이사항 메모']
@@ -113,6 +125,17 @@ Table symptom_scores {
   }
 
   Note: '증상별 점수. 기록하지 않은 증상은 행을 만들지 않는다(null 대신 미존재)'
+}
+
+Table record_skin_signs {
+  record_id bigint [not null]
+  skin_sign skin_sign [not null, note: '오늘 나타난 증상. 없으면 행을 만들지 않는다']
+
+  indexes {
+    (record_id, skin_sign) [unique, name: 'uk_record_skin_signs']
+  }
+
+  Note: '하루 단위로 기록하는 나타난 증상(부위별 점수와 별개). 기록 삭제 시 함께 삭제'
 }
 
 Table photos {
@@ -187,6 +210,7 @@ Ref: refresh_tokens.member_id > members.id [delete: cascade]
 Ref: records.member_id > members.id [delete: cascade]
 Ref: skin_conditions.record_id > records.id [delete: cascade]
 Ref: symptom_scores.skin_condition_id > skin_conditions.id [delete: cascade]
+Ref: record_skin_signs.record_id > records.id [delete: cascade]
 Ref: photos.record_id > records.id [delete: cascade]
 Ref: chatbot_sessions.member_id > members.id [delete: cascade]
 Ref: chatbot_messages.session_id > chatbot_sessions.id [delete: cascade]
