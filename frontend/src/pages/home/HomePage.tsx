@@ -12,6 +12,7 @@ import { eachDay, formatMonthDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { representativeScore } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
+import WeatherCard from './WeatherCard';
 import WeeklyScoreChart, { type DailyScore } from './WeeklyScoreChart';
 
 const CHART_DAYS = 7;
@@ -60,6 +61,8 @@ export default function HomePage() {
           <p className="text-gray-500">{formatKoreanDate(todayString)}</p>
           <p className="mt-1 text-xl font-bold">{me.data ? `${me.data.nickname}님, 안녕하세요` : '안녕하세요'}</p>
         </section>
+
+        <WeatherCard />
 
         {records.loading ? (
           <LoadingMessage />
