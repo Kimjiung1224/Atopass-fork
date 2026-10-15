@@ -8,12 +8,12 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
 import type { AnalysisSummary } from '@/types/analysis';
-import type { BodyPart, SymptomKey } from '@/types/record';
-import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN, SYMPTOM_LABELS } from '@/utils/constants';
+import type { BodyPart } from '@/types/record';
+import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
 import { today } from '@/utils/date';
 import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { representativeScore } from '@/utils/recordScore';
+import { bodyPartScoreOf, representativeScore } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
 
 type Period = '30' | '90' | 'ALL';
@@ -32,7 +32,6 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 const BODY_PART_OPTIONS = Object.entries(BODY_PART_LABELS).map(([value, label]) => ({ value: value as BodyPart, label }));
-const SYMPTOM_OPTIONS = Object.entries(SYMPTOM_LABELS).map(([value, label]) => ({ value: value as SymptomKey, label }));
 
 /** '전체' 기간 조회 시작일. 그래프는 첫 기록일부터 그린다. */
 const ALL_START_DATE = '2000-01-01';
@@ -60,37 +59,29 @@ export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overall');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
-  const [symptom, setSymptom] = useState<SymptomKey>('itching');
 
   const range = useMemo(() => periodToRange(period), [period]);
   const isAll = period === 'ALL';
   const isBodyPartTab = tab === 'bodyPart';
 
   const summary = useAsync(() => analysisApi.getSummary(range), [range]);
-  // '전체'·'수면·생활' 탭은 /analysis/trends(bodyPart, symptom 필수)로 담을 수 없어 기록 목록을 가공한다 (명세 4-2 임시안)
-  const records = useAsync(
-    () => (isBodyPartTab ? Promise.resolve(undefined) : getAllRecords(range.startDate, range.endDate)),
-    [range, isBodyPartTab],
-  );
-  const trends = useAsync(
-    () => (isBodyPartTab ? analysisApi.getTrends({ ...range, bodyPart, symptom }) : Promise.resolve(undefined)),
-    [range, isBodyPartTab, bodyPart, symptom],
-  );
+  // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
+  const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
 
   const series = useMemo(() => {
-    if (isBodyPartTab) {
-      const points = (trends.data?.points ?? []).map((p) => ({ date: p.date, value: p.score, recordId: p.recordId }));
-      return toDailySeries(points, range.startDate, range.endDate, isAll);
-    }
     const items = (records.data ?? []).map((r) => ({
       date: r.recordDate,
-      value: tab === 'sleep' ? (r.sleepHours ?? null) : representativeScore(r.skinConditions),
+      value:
+        tab === 'sleep'
+          ? (r.sleepHours ?? null)
+          : isBodyPartTab
+            ? bodyPartScoreOf(r.skinConditions, bodyPart)
+            : representativeScore(r.skinConditions),
       recordId: r.recordId,
     }));
     return toDailySeries(items, range.startDate, range.endDate, isAll);
-  }, [isBodyPartTab, tab, trends.data, records.data, range, isAll]);
+  }, [isBodyPartTab, tab, bodyPart, records.data, range, isAll]);
 
-  const active = isBodyPartTab ? trends : records;
   const hasValue = series.some((d) => d.value !== null);
   // 그래프 점을 누르면 그날의 총정리 화면으로 이동한다.
   const openRecord = (datum: TrendDatum) => navigate(recordPath(datum.date));
@@ -123,17 +114,17 @@ export default function AnalysisPage() {
           </div>
 
           {isBodyPartTab && (
-            <div className="mb-4 flex flex-col gap-2">
+            <div className="mb-3 flex flex-col gap-2">
               <ChipGroup label="부위" options={BODY_PART_OPTIONS} value={bodyPart} onChange={setBodyPart} />
-              <ChipGroup label="증상" options={SYMPTOM_OPTIONS} value={symptom} onChange={setSymptom} />
+              <p className="text-sm text-gray-400">그 부위에 기록한 증상 점수의 평균이에요.</p>
             </div>
           )}
           {tab === 'overall' && <p className="-mt-1 mb-3 text-sm text-gray-400">그날 기록한 증상 중 가장 높은 점수예요.</p>}
 
-          {active.loading ? (
+          {records.loading ? (
             <LoadingMessage />
-          ) : active.error ? (
-            <ErrorMessage message={getErrorMessage(active.error)} onRetry={active.reload} />
+          ) : records.error ? (
+            <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
           ) : !hasValue ? (
             <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
           ) : tab === 'sleep' ? (
@@ -142,13 +133,13 @@ export default function AnalysisPage() {
             <TrendLineChart
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
-              formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `증상 점수 ${v}점`)}
+              formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 증상 점수 ${v}점`)}
               onPointClick={openRecord}
-              ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위·증상별 점수 변화 그래프'}
+              ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위별 증상 점수 변화 그래프'}
             />
           )}
 
-          {hasValue && !active.loading && !active.error && (
+          {hasValue && !records.loading && !records.error && (
             <p className="mt-3 text-sm text-gray-400">그래프를 누르면 그날의 기록을 볼 수 있어요.</p>
           )}
         </section>
