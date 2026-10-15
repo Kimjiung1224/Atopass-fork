@@ -23,7 +23,7 @@ function ScoreTooltip({ active, payload }: TooltipContentProps<ValueType, NameTy
     <div className="rounded-lg bg-white px-3 py-2 text-sm shadow-md ring-1 ring-gray-200">
       <p className="font-medium text-gray-700">{formatKoreanDate(point.date)}</p>
       <p className={point.score === null ? 'text-gray-400' : 'text-emerald-700'}>
-        {point.score === null ? EMPTY_TEXT : `가장 높은 증상 점수 ${point.score}점`}
+        {point.score === null ? EMPTY_TEXT : `평균 증상 점수 ${point.score}점`}
       </p>
     </div>
   );

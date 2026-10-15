@@ -10,7 +10,7 @@ import { useAsync } from '@/hooks/useAsync';
 import { formatKoreanDate, today } from '@/utils/date';
 import { eachDay, formatMonthDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { representativeScore } from '@/utils/recordScore';
+import { averageScore } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
 import WeatherCard from './WeatherCard';
 import WeeklyScoreChart, { type DailyScore } from './WeeklyScoreChart';
@@ -27,14 +27,14 @@ export default function HomePage() {
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
 
   const todayRecord = records.data?.find((record) => record.recordDate === todayString);
-  const todayScore = representativeScore(todayRecord?.skinConditions);
+  const todayScore = averageScore(todayRecord?.skinConditions);
 
   const chartData = useMemo<DailyScore[]>(() => {
     const byDate = new Map((records.data ?? []).map((record) => [record.recordDate, record]));
     return eachDay(range.startDate, range.endDate).map((date) => ({
       date,
       label: date === todayString ? '오늘' : formatMonthDay(date),
-      score: representativeScore(byDate.get(date)?.skinConditions),
+      score: averageScore(byDate.get(date)?.skinConditions),
     }));
   }, [records.data, range, todayString]);
 
@@ -77,7 +77,7 @@ export default function HomePage() {
                   <p className="flex items-center gap-2">
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">기록됨</span>
                     <span className="text-gray-600">
-                      {todayScore === null ? '증상 점수 기록 없음' : `가장 높은 증상 점수 ${todayScore}점`}
+                      {todayScore === null ? '증상 점수 기록 없음' : `평균 증상 점수 ${todayScore}점`}
                     </span>
                   </p>
                   <Link
@@ -105,7 +105,7 @@ export default function HomePage() {
 
             <section className="rounded-2xl border border-gray-200 p-4">
               <h2 className="font-bold text-gray-700">최근 7일 증상 점수</h2>
-              <p className="mb-3 text-sm text-gray-400">그날 기록한 증상 중 가장 높은 점수예요.</p>
+              <p className="mb-3 text-sm text-gray-400">그날 기록한 부위별 증상 점수의 평균이에요.</p>
               {hasAnyScore ? (
                 <WeeklyScoreChart data={chartData} />
               ) : (
