@@ -16,7 +16,7 @@ const QUICK_RANGES = [
 ];
 
 /** 사진 외 항목은 API(POST /reports)가 선택을 받지 않아 항상 포함된다 (화면 명세서 4-3 미정) */
-const FIXED_ITEMS = ['부위별 증상 변화', '수면', '특이사항'];
+const FIXED_ITEMS = ['증상이 갑자기 심해진 날', '그날·전날의 수면·음주·야외활동', '특이사항 메모'];
 
 export default function ReportPage() {
   const todayString = today();
@@ -125,7 +125,9 @@ export default function ReportPage() {
                 </label>
               </li>
             </ul>
-            <p className="mt-2 text-sm text-gray-400">사진 외 항목은 현재 항상 포함돼요.</p>
+            <p className="mt-2 text-sm text-gray-400">
+              전체를 요약하지 않고, 증상이 갑자기 심해진 날과 그 무렵 평소와 달랐던 점을 정리해요. 사진 외 항목은 항상 포함돼요.
+            </p>
           </fieldset>
 
           {formError && (
