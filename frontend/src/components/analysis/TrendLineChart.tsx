@@ -19,6 +19,22 @@ interface Props {
   ariaLabel: string;
 }
 
+/**
+ * 그래프를 누른 위치의 날짜 데이터.
+ * 고른 날이 없을 때 activeTooltipIndex가 null로 오는데, Number(null)이 0이 되어
+ * 첫날이 골라지던 문제가 있어 날짜(activeLabel)로 먼저 찾고 null은 걸러 낸다.
+ */
+export function datumFromClick(
+  data: TrendDatum[],
+  state: { activeLabel?: unknown; activeTooltipIndex?: unknown } | null | undefined,
+): TrendDatum | undefined {
+  const label = state?.activeLabel;
+  if (typeof label === 'string') return data.find((d) => d.date === label);
+  const index = state?.activeTooltipIndex;
+  if (index === null || index === undefined || index === '') return undefined;
+  return data[Number(index)];
+}
+
 const BRAND = '#059669'; // emerald-600
 const GAP = '#a8b3bf';
 
@@ -42,15 +58,14 @@ export default function TrendLineChart({ data, domain, formatValue, onPointClick
   };
 
   return (
-    <div className={`h-56 ${onPointClick ? 'cursor-pointer' : ''}`} role="img" aria-label={ariaLabel}>
+    <div className={`h-56 [&_*:focus:not(:focus-visible)]:outline-none ${onPointClick ? 'cursor-pointer' : ''}`} role="img" aria-label={ariaLabel}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
           margin={{ top: 8, right: 8, bottom: 0, left: -24 }}
           onClick={(state) => {
-            // 점을 정확히 누르지 않아도 가장 가까운 날짜의 기록으로 이동한다.
-            const index = Number(state?.activeTooltipIndex);
-            const datum = Number.isInteger(index) ? data[index] : undefined;
+            // 점을 정확히 누르지 않아도 가장 가까운 날짜를 고른다.
+            const datum = datumFromClick(data, state);
             if (onPointClick && datum && datum.recordId !== null && datum.value !== null) onPointClick(datum);
           }}
         >

@@ -3,7 +3,7 @@ import type { NameType, ValueType } from 'recharts/types/component/DefaultToolti
 import { EMPTY_TEXT } from '@/utils/constants';
 import { formatKoreanDate } from '@/utils/date';
 import { formatMonthDay } from '@/utils/dateRange';
-import type { TrendDatum } from './TrendLineChart';
+import { datumFromClick, type TrendDatum } from './TrendLineChart';
 
 interface Props {
   data: TrendDatum[];
@@ -26,14 +26,13 @@ export default function SleepBarChart({ data, onBarClick }: Props) {
   };
 
   return (
-    <div className={`h-56 ${onBarClick ? 'cursor-pointer' : ''}`} role="img" aria-label="날짜별 수면 시간 그래프">
+    <div className={`h-56 [&_*:focus:not(:focus-visible)]:outline-none ${onBarClick ? 'cursor-pointer' : ''}`} role="img" aria-label="날짜별 수면 시간 그래프">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
           margin={{ top: 8, right: 8, bottom: 0, left: -24 }}
           onClick={(state) => {
-            const index = Number(state?.activeTooltipIndex);
-            const datum = Number.isInteger(index) ? data[index] : undefined;
+            const datum = datumFromClick(data, state);
             if (onBarClick && datum && datum.recordId !== null && datum.value !== null) onBarClick(datum);
           }}
         >
