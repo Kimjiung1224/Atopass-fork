@@ -36,7 +36,7 @@ export default function TrendLineChart({ data, domain, formatValue, onPointClick
         <p className={datum.value === null ? 'text-gray-400' : 'text-emerald-700'}>
           {datum.value === null ? EMPTY_TEXT : formatValue(datum.value)}
         </p>
-        {onPointClick && datum.recordId !== null && <p className="mt-0.5 text-gray-400">누르면 그날 기록을 볼 수 있어요</p>}
+        {onPointClick && datum.recordId !== null && <p className="mt-0.5 text-gray-400">누르면 아래에서 그날 기록을 볼 수 있어요</p>}
       </div>
     );
   };
