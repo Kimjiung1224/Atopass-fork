@@ -85,6 +85,7 @@ cd frontend && npm run build     # 타입 검사(tsc)와 빌드
 
 - API 명세: `docs/Skinlog_openapi.yaml` — [Swagger Editor](https://editor.swagger.io/)에 붙여넣거나 Swagger UI로 볼 수 있습니다. 프론트와 백엔드의 약속(계약)이므로, 필드를 바꿀 때는 코드보다 먼저 이 파일을 고칩니다.
 - ERD: `docs/Skinlog_erd.dbml` — [dbdiagram.io](https://dbdiagram.io/)에 붙여넣으면 그림으로 보입니다.
+- 배포: [`docs/DEPLOY.md`](docs/DEPLOY.md) — Oracle 무료 VM + Docker로 올리는 방법과, `main` 머지 시 자동 배포되는 흐름
 
 ## 개발 규칙
 
