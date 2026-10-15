@@ -46,6 +46,47 @@ class ReportContentFactoryTest {
 		assertThat(ReportContentFactory.flareDays(List.of(day(0, 9)))).isEmpty();
 	}
 
+	@Test
+	void 고통_지수가_3점_이상_오르면_부위별_증상이_없어도_심해진_날이다() {
+		List<FlareDay> flares = ReportContentFactory.flareDays(List.of(
+			painDay(0, 2), painDay(1, 3), painDay(2, 6), painDay(3, 5)));
+
+		assertThat(flares).singleElement().satisfies(flare -> {
+			assertThat(flare.day().date()).isEqualTo(START.plusDays(2));
+			assertThat(flare.jumps()).singleElement().satisfies(jump -> {
+				assertThat(jump.bodyPart()).isNull();
+				assertThat(jump.symptom()).isNull();
+				assertThat(jump.previousScore()).isEqualTo(3);
+				assertThat(jump.score()).isEqualTo(6);
+			});
+		});
+	}
+
+	@Test
+	void 고통_지수가_0에서_3으로_올라도_심해진_날이다() {
+		// 0은 기록한 값이다. 기록하지 않은 날로 건너뛰면 이 상승을 놓친다.
+		List<FlareDay> flares = ReportContentFactory.flareDays(List.of(painDay(0, 0), painDay(1, 3)));
+
+		assertThat(flares).singleElement().satisfies(flare ->
+			assertThat(flare.jumps().get(0).previousScore()).isZero());
+	}
+
+	@Test
+	void 고통_지수는_기록하지_않은_날을_건너뛰고_직전_기록과_비교한다() {
+		List<FlareDay> flares = ReportContentFactory.flareDays(List.of(
+			painDay(0, 1), day(1, 4), painDay(2, 5)));
+
+		assertThat(flares).singleElement().satisfies(flare -> {
+			assertThat(flare.day().date()).isEqualTo(START.plusDays(2));
+			assertThat(flare.jumps().get(0).previousDate()).isEqualTo(START);
+		});
+	}
+
+	private DayEntry painDay(int plusDays, int painIndex) {
+		return new DayEntry(START.plusDays(plusDays), new EnumMap<>(BodyPart.class), null, null, null, null,
+			List.of(), painIndex, null, List.of());
+	}
+
 	private DayEntry day(int plusDays, int itching) {
 		Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
 		conditions.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.ITCHING, itching)));

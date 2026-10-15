@@ -1154,9 +1154,15 @@ components:
           allOf:
             - $ref: '#/components/schemas/OutdoorActivity'
           nullable: true
+    SkinSign:
+      type: string
+      description: 오늘 피부에 나타난 증상. 부위별 증상 점수와 별개로 하루 단위로 기록한다. XEROSIS 피부건조증, ERYTHEMA 홍반, SCALING 각질, PAPULE 구진, EXCORIATION 긁은 자국, NODULE 결절, LICHENIFICATION 태선화
+      enum: [XEROSIS, ERYTHEMA, SCALING, PAPULE, EXCORIATION, NODULE, LICHENIFICATION]
+      example: XEROSIS
     RecordRequest:
       type: object
-      required: [recordDate, skinConditions]
+      description: 부위별 증상(skinConditions)과 고통 지수(painIndex) 중 하나 이상은 있어야 한다.
+      required: [recordDate]
       properties:
         recordDate:
           type: string
@@ -1164,13 +1170,29 @@ components:
           example: '2026-10-10'
         skinConditions:
           type: array
-          minItems: 1
+          description: 부위별 증상 점수. 고통 지수가 있으면 비워도 된다.
           items:
             $ref: '#/components/schemas/SkinCondition'
+        painIndex:
+          type: integer
+          minimum: 0
+          maximum: 10
+          nullable: true
+          description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+          example: 6
         sleepHours:
           type: number
           nullable: true
           example: 6
+        medication:
+          type: boolean
+          nullable: true
+          description: 오늘 약을 복용했는지. 기록하지 않았으면 null
+        skinSigns:
+          type: array
+          description: 오늘 나타난 증상. 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/SkinSign'
         lifestyle:
           $ref: '#/components/schemas/Lifestyle'
         notes:
@@ -1213,6 +1235,14 @@ components:
         - $ref: '#/components/schemas/RecordRequest'
         - type: object
           properties:
+            sleepScore:
+              type: integer
+              minimum: 1
+              maximum: 5
+              nullable: true
+              readOnly: true
+              description: 수면 점수(서버가 수면 시간으로 계산). 7~9시간이 5점이고 그 범위에서 2시간 벗어날 때마다 1점 감점, 최저 1점. 수면 시간이 없으면 null
+              example: 4
             photos:
               type: array
               items:
@@ -1225,7 +1255,7 @@ components:
               format: date-time
     RecordSummary:
       type: object
-      description: 목록 항목. 포함할 점수 필드는 협의 후 확정한다.
+      description: 목록 항목. 홈·캘린더·그래프는 고통 지수(painIndex)를 하루의 대표 점수로 쓰고, 없으면 부위별 점수의 최고값을 쓴다.
       properties:
         recordId:
           type: integer
@@ -1237,9 +1267,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SkinCondition'
+        painIndex:
+          type: integer
+          minimum: 0
+          maximum: 10
+          nullable: true
+          description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+          example: 6
         sleepHours:
           type: number
           nullable: true
+        sleepScore:
+          type: integer
+          nullable: true
+          description: 수면 점수 1~5. 수면 시간이 없으면 null
         photoCount:
           type: integer
     RecordPage:
@@ -1303,14 +1344,20 @@ components:
             properties:
               type:
                 type: string
+                description: SYMPTOM_CHANGE(부위·증상 점수 변화) 또는 PAIN_INDEX_CHANGE(고통 지수 변화). 고통 지수 변화이면 bodyPart와 symptom은 null이다.
+                enum: [SYMPTOM_CHANGE, PAIN_INDEX_CHANGE]
                 example: SYMPTOM_CHANGE
               message:
                 type: string
                 example: 팔 가려움 점수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)
               bodyPart:
-                $ref: '#/components/schemas/BodyPart'
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/BodyPart'
               symptom:
-                $ref: '#/components/schemas/Symptom'
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/Symptom'
               direction:
                 type: string
                 description: 평균보다 높게(HIGH) 또는 낮게(LOW) 기록된 구간
@@ -1354,9 +1401,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SkinCondition'
+        painIndex:
+          type: integer
+          minimum: 0
+          maximum: 10
+          nullable: true
+          description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+          example: 6
         sleepHours:
           type: number
           nullable: true
+        sleepScore:
+          type: integer
+          nullable: true
+          description: 수면 점수 1~5. 수면 시간이 없으면 null
+        medication:
+          type: boolean
+          nullable: true
+          description: 오늘 약을 복용했는지. 기록하지 않았으면 null
+        skinSigns:
+          type: array
+          description: 오늘 나타난 증상. 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/SkinSign'
         lifestyle:
           $ref: '#/components/schemas/Lifestyle'
         notes:
@@ -1397,11 +1464,12 @@ components:
           type: array
           description: |
             아직 입력되지 않은 항목. 필수 항목이 먼저 온다. 증상 이름(itching 등)이 아니라 다음 값 중 일부다.
-            bodyPart(부위), symptoms(증상 점수), sleepHours(수면), lifestyle(음주·야외활동), notes(특이사항)
+            painIndex(고통 지수, 필수), symptoms(증상 점수. 부위를 말했지만 점수가 아직 없을 때),
+            sleepHours(수면), medication(약 복용), skinSigns(나타난 증상), notes(특이사항)
           items:
             type: string
-            enum: [bodyPart, symptoms, sleepHours, lifestyle, notes]
-          example: [sleepHours, lifestyle, notes]
+            enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
+          example: [sleepHours, medication, skinSigns, notes]
         requiresConfirmation:
           type: boolean
           description: true이면 기록 초안을 확인하는 단계(총정리)로 넘어간다.
@@ -1415,9 +1483,29 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SkinCondition'
+            painIndex:
+              type: integer
+              minimum: 0
+              maximum: 10
+              nullable: true
+              description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+              example: 6
             sleepHours:
               type: number
               nullable: true
+            sleepScore:
+              type: integer
+              nullable: true
+              description: 수면 점수 1~5. 수면 시간이 없으면 null
+            medication:
+              type: boolean
+              nullable: true
+            skinSigns:
+              type: array
+              nullable: true
+              description: 나타난 증상. 아직 묻지 않았으면 null, 없다고 답했으면 빈 배열
+              items:
+                $ref: '#/components/schemas/SkinSign'
             lifestyle:
               $ref: '#/components/schemas/Lifestyle'
             notes:
@@ -1444,9 +1532,29 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/SkinCondition'
+            painIndex:
+              type: integer
+              minimum: 0
+              maximum: 10
+              nullable: true
+              description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+              example: 6
             sleepHours:
               type: number
               nullable: true
+            sleepScore:
+              type: integer
+              nullable: true
+              description: 수면 점수 1~5. 수면 시간이 없으면 null
+            medication:
+              type: boolean
+              nullable: true
+            skinSigns:
+              type: array
+              nullable: true
+              description: 나타난 증상. 아직 묻지 않았으면 null, 없다고 답했으면 빈 배열
+              items:
+                $ref: '#/components/schemas/SkinSign'
             lifestyle:
               $ref: '#/components/schemas/Lifestyle'
             notes:
@@ -1456,7 +1564,7 @@ components:
           type: array
           items:
             type: string
-            enum: [bodyPart, symptoms, sleepHours, lifestyle, notes]
+            enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
         requiresConfirmation:
           type: boolean
           description: 마지막 메시지 응답과 같은 값. 새로고침 뒤에도 유지된다.
@@ -1485,22 +1593,41 @@ components:
           example: true
         record:
           type: object
-          description: 저장할 기록 내용 (피부 기록 생성의 필드와 같다)
+          description: 저장할 기록 내용 (피부 기록 생성의 필드와 같다). 부위별 증상(skinConditions)과 고통 지수(painIndex) 중 하나 이상은 있어야 한다.
           properties:
             skinConditions:
               type: array
               items:
                 $ref: '#/components/schemas/SkinCondition'
+            painIndex:
+              type: integer
+              minimum: 0
+              maximum: 10
+              nullable: true
+              description: 고통 지수. 오늘 피부 때문에 느낀 고통의 정도(0은 없음, 10은 매우 심함). 사용자가 느낀 주관적인 정도이며 의료적인 중증도가 아니다. 0도 기록한 값이다.
+              example: 6
             sleepHours:
               type: number
               nullable: true
+            medication:
+              type: boolean
+              nullable: true
+              description: 오늘 약을 복용했는지. 기록하지 않았으면 null
+            skinSigns:
+              type: array
+              description: 오늘 나타난 증상. 없으면 빈 배열
+              items:
+                $ref: '#/components/schemas/SkinSign'
             lifestyle:
               $ref: '#/components/schemas/Lifestyle'
             notes:
               type: string
               nullable: true
           example:
+            painIndex: 6
             sleepHours: 6
+            medication: true
+            skinSigns: [XEROSIS, EXCORIATION]
             notes: 오늘 팔이 많이 가려웠음
 
     # ── 보고서 ──

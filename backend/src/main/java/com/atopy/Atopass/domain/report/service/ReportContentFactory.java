@@ -39,13 +39,14 @@ class ReportContentFactory {
 	}
 
 	/**
-	 * 부위·증상마다 직전에 기록한 점수와 비교해 {@link #FLARE_JUMP}점 이상 오른 날을 고른다.
+	 * 부위·증상, 그리고 고통 지수마다 직전에 기록한 점수와 비교해 {@link #FLARE_JUMP}점 이상 오른 날을 고른다.
 	 * 기간 첫 기록은 비교할 직전 기록이 없어 고르지 않는다.
 	 */
 	static List<FlareDay> flareDays(List<DayEntry> days) {
 		record Last(LocalDate date, int score) {
 		}
 		Map<BodyPart, Map<Symptom, Last>> last = new EnumMap<>(BodyPart.class);
+		Last[] lastPain = {null};
 		List<FlareDay> flares = new ArrayList<>();
 		DayEntry previous = null;
 		for (DayEntry day : days) {
@@ -57,6 +58,13 @@ class ReportContentFactory {
 				}
 				last.get(bodyPart).put(symptom, new Last(day.date(), score));
 			}));
+			if (day.painIndex() != null) {
+				Last before = lastPain[0];
+				if (before != null && day.painIndex() - before.score() >= FLARE_JUMP) {
+					jumps.add(new ScoreJump(null, null, before.date(), before.score(), day.painIndex()));
+				}
+				lastPain[0] = new Last(day.date(), day.painIndex());
+			}
 			if (!jumps.isEmpty()) {
 				jumps.sort(Comparator.comparingInt((ScoreJump j) -> j.score() - j.previousScore()).reversed());
 				boolean hasDayBefore = previous != null && previous.date().equals(day.date().minusDays(1));
@@ -78,7 +86,8 @@ class ReportContentFactory {
 		}
 		List<ReportPhoto> photos = includePhotos ? photoSource.photosOf(record.getId()) : List.of();
 		return new DayEntry(record.getRecordDate(), conditions, record.getSleepHours(),
-			record.getAlcohol(), record.getOutdoorActivity(), record.getNotes(), photos);
+			record.getAlcohol(), record.getOutdoorActivity(), record.getNotes(), photos,
+			record.getPainIndex(), record.getMedication(), record.getSkinSigns().stream().sorted().toList());
 	}
 
 	private LifestyleSummary lifestyleSummary(List<SkinRecord> records) {

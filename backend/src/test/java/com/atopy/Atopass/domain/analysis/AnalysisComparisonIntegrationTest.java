@@ -74,6 +74,30 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 			.param("dateA", dateA.toString()).param("dateB", dateB.toString());
 	}
 
+	@Test
+	void 고통_지수와_약_복용과_나타난_증상과_수면_점수도_함께_내려준다() throws Exception {
+		String bearer = newMemberBearer();
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", DATE_A.toString());
+		body.put("painIndex", 0);
+		body.put("sleepHours", 6);
+		body.put("medication", true);
+		body.put("skinSigns", List.of("ERYTHEMA", "XEROSIS"));
+		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(comparison(bearer, DATE_A, DATE_B))
+			.andExpect(status().isOk())
+			// 0은 기록한 값이다. null과 구분되어야 한다.
+			.andExpect(jsonPath("$.data.A.painIndex").value(0))
+			.andExpect(jsonPath("$.data.A.sleepScore").value(4))
+			.andExpect(jsonPath("$.data.A.medication").value(true))
+			// 정의된 순서(피부건조증이 홍반보다 먼저)로 내려온다.
+			.andExpect(jsonPath("$.data.A.skinSigns[0]").value("XEROSIS"))
+			.andExpect(jsonPath("$.data.A.skinSigns[1]").value("ERYTHEMA"))
+			.andExpect(jsonPath("$.data.B").doesNotExist());
+	}
+
 	private long createRecord(String bearer, LocalDate date, Map<String, Object> symptoms) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");

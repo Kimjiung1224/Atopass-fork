@@ -1,6 +1,7 @@
 package com.atopy.Atopass.domain.report.service;
 
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.report.service.ReportContent.DayEntry;
 import com.atopy.Atopass.domain.report.service.ReportContent.FlareDay;
 import com.atopy.Atopass.domain.report.service.ReportContent.LifestyleSummary;
@@ -57,15 +58,30 @@ class ReportHtmlBuilder {
 			.append("<table class=\"meta\">")
 			.append(row("조회 기간", DATE.format(content.startDate()) + " ~ " + DATE.format(content.endDate())))
 			.append(row("기록 수", content.recordCount() + "일"))
-			.append(row("증상이 갑자기 심해진 날", content.flareDays().size() + "일"))
-			.append(row("평소 생활 (기간 평균)", usualLifestyleText(content.lifestyle())))
+			.append(row("증상이 갑자기 심해진 날", content.flareDays().size() + "일"));
+		String pain = painSummaryText(content.days());
+		if (pain != null) {
+			html.append(row("고통 지수 (기간 평균·최고)", pain));
+		}
+		html.append(row("평소 생활 (기간 평균)", usualLifestyleText(content.lifestyle())))
 			.append(row("작성일", DATE.format(content.generatedDate())))
 			.append("</table>");
 	}
 
+	/** 고통 지수를 기록한 날의 평균과 최고. 기록한 날이 없으면 null. 0도 기록한 값이다. */
+	private String painSummaryText(List<DayEntry> days) {
+		List<Integer> scores = days.stream().map(DayEntry::painIndex).filter(p -> p != null).toList();
+		if (scores.isEmpty()) {
+			return null;
+		}
+		double average = scores.stream().mapToInt(Integer::intValue).average().orElse(0);
+		int max = scores.stream().mapToInt(Integer::intValue).max().orElse(0);
+		return String.format(Locale.ROOT, "평균 %.1f · 최고 %d (%d일 기록)", average, max, scores.size());
+	}
+
 	private void flareSection(StringBuilder html, ReportContent content) {
 		html.append("<h2>증상이 갑자기 심해진 날</h2>")
-			.append("<p class=\"hint\">같은 부위·증상이 직전 기록보다 ").append(ReportContentFactory.FLARE_JUMP)
+			.append("<p class=\"hint\">같은 부위·증상 또는 고통 지수가 직전 기록보다 ").append(ReportContentFactory.FLARE_JUMP)
 			.append("점 이상 오른 날입니다. 점수는 환자가 느낀 주관적인 정도(0~10)이며 의료적인 중증도가 아닙니다. ")
 			.append("평소와 달랐던 생활은 굵게 표시했습니다.</p>");
 		if (content.flareDays().isEmpty()) {
@@ -77,8 +93,7 @@ class ReportHtmlBuilder {
 			DayEntry day = flare.day();
 			html.append("<div class=\"flare\"><h3>").append(DATE_WITH_DAY.format(day.date())).append("</h3><ul>");
 			for (ScoreJump jump : flare.jumps()) {
-				html.append("<li>").append(escape(jump.bodyPart().label())).append(' ')
-					.append(escape(jump.symptom().label())).append(" <b>").append(jump.previousScore())
+				html.append("<li>").append(escape(jumpLabel(jump))).append(" <b>").append(jump.previousScore())
 					.append("점 → ").append(jump.score()).append("점</b> (").append(SHORT_DATE.format(jump.previousDate()))
 					.append(" 기록 대비 +").append(jump.score() - jump.previousScore()).append(")</li>");
 			}
@@ -144,7 +159,19 @@ class ReportHtmlBuilder {
 			String outdoor = "야외활동 " + outdoorText(day.outdoorActivity());
 			parts.add(day.outdoorActivity() == OutdoorActivity.HIGH ? "<b>" + outdoor + "</b>" : outdoor);
 		}
+		if (day.medication() != null) {
+			parts.add(day.medication() ? "약 복용" : "약 미복용");
+		}
+		if (day.skinSigns() != null && !day.skinSigns().isEmpty()) {
+			parts.add("나타난 증상 " + escape(day.skinSigns().stream().map(SkinSign::label)
+				.collect(java.util.stream.Collectors.joining(", "))));
+		}
 		return parts.isEmpty() ? "생활 기록 없음" : String.join(" · ", parts);
+	}
+
+	private String jumpLabel(ScoreJump jump) {
+		return jump.bodyPart() == null || jump.symptom() == null
+			? "고통 지수" : jump.bodyPart().label() + " " + jump.symptom().label();
 	}
 
 	private boolean isShortSleep(DayEntry day, Double usualSleep) {

@@ -98,7 +98,7 @@ public class AnalysisService {
 			.toList();
 	}
 
-	/** 부위·증상별 점수 시계열마다 변화점을 찾아 인사이트로 만든다. */
+	/** 부위·증상별 점수 시계열과 고통 지수 시계열마다 변화점을 찾아 인사이트로 만든다. */
 	private List<InsightResponse> detectInsights(List<SkinRecord> records) {
 		Map<BodyPart, Map<Symptom, List<Point>>> series = new EnumMap<>(BodyPart.class);
 		for (SkinRecord record : records) {
@@ -111,11 +111,18 @@ public class AnalysisService {
 			}
 		}
 
+		// bodyPart·symptom이 null이면 고통 지수의 변화다.
 		record Found(BodyPart bodyPart, Symptom symptom, Range range) {
 		}
 		List<Found> found = new ArrayList<>();
 		series.forEach((bodyPart, bySymptom) -> bySymptom.forEach((symptom, points) ->
 			ChangePointDetector.detect(points).forEach(range -> found.add(new Found(bodyPart, symptom, range)))));
+
+		List<Point> painPoints = records.stream()
+			.filter(record -> record.getPainIndex() != null)
+			.map(record -> new Point(record.getRecordDate(), record.getPainIndex()))
+			.toList();
+		ChangePointDetector.detect(painPoints).forEach(range -> found.add(new Found(null, null, range)));
 
 		return found.stream()
 			.sorted(Comparator.comparingDouble((Found f) -> f.range().maxDeviation()).reversed()
@@ -130,6 +137,12 @@ public class AnalysisService {
 		String period = range.startDate().equals(range.endDate())
 			? DAY_FORMAT.format(range.startDate())
 			: DAY_FORMAT.format(range.startDate()) + "~" + DAY_FORMAT.format(range.endDate());
+		if (bodyPart == null || symptom == null) {
+			String message = String.format(Locale.ROOT, "고통 지수가 평소(평균 %.1f)보다 %s 기록된 구간이 있습니다. (%s)",
+				range.mean(), comparison, period);
+			return new InsightResponse(InsightResponse.PAIN_INDEX_CHANGE, message, null, null,
+				range.direction().name(), range.startDate(), range.endDate());
+		}
 		String message = String.format(Locale.ROOT, "%s %s 점수가 평소(평균 %.1f)보다 %s 기록된 구간이 있습니다. (%s)",
 			bodyPart.label(), symptom.label(), range.mean(), comparison, period);
 		return new InsightResponse(InsightResponse.SYMPTOM_CHANGE, message, bodyPart, symptom,
