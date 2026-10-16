@@ -181,14 +181,27 @@ public final class ChatDraft {
 
 		JsonNode conditionList = updates.path("conditions");
 		if (present(conditionList)) {
-			if (!conditionList.isArray()) {
-				return ApplyResult.INVALID_VALUE;
-			}
-			for (JsonNode item : conditionList) {
-				ApplyResult result = next.applyCondition(item);
-				if (result != ApplyResult.OK) {
-					return result;
+			// 정해진 형식은 [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]이지만,
+			// LLM이 {"FACE": {"itching": 8}}처럼 부위를 키로 쓰는 경우도 같은 뜻으로 받는다.
+			if (conditionList.isObject()) {
+				for (Map.Entry<String, JsonNode> entry : conditionList.properties()) {
+					ApplyResult result = next.applyCondition(entry.getKey(), entry.getValue());
+					if (result != ApplyResult.OK) {
+						return result;
+					}
 				}
+			} else if (conditionList.isArray()) {
+				for (JsonNode item : conditionList) {
+					if (!item.isObject() || !item.path("bodyPart").isString()) {
+						return ApplyResult.INVALID_VALUE;
+					}
+					ApplyResult result = next.applyCondition(item.path("bodyPart").asString(), item.path("symptoms"));
+					if (result != ApplyResult.OK) {
+						return result;
+					}
+				}
+			} else {
+				return ApplyResult.INVALID_VALUE;
 			}
 		}
 
@@ -290,19 +303,15 @@ public final class ChatDraft {
 		return !node.isMissingNode() && !node.isNull();
 	}
 
-	private ApplyResult applyCondition(JsonNode item) {
-		if (!item.isObject() || !item.path("bodyPart").isString()) {
-			return ApplyResult.INVALID_VALUE;
-		}
+	private ApplyResult applyCondition(String bodyPartName, JsonNode symptoms) {
 		BodyPart bodyPart;
 		try {
-			bodyPart = BodyPart.valueOf(item.path("bodyPart").asString().trim().toUpperCase(Locale.ROOT));
+			bodyPart = BodyPart.valueOf(bodyPartName.trim().toUpperCase(Locale.ROOT));
 		} catch (IllegalArgumentException e) {
 			return ApplyResult.INVALID_VALUE;
 		}
 		Map<Symptom, Integer> scores = conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class));
 
-		JsonNode symptoms = item.path("symptoms");
 		if (!present(symptoms)) {
 			return ApplyResult.OK;
 		}

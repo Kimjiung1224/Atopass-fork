@@ -67,6 +67,8 @@ class ChatPromptFactory {
 			설명이나 코드블록 없이 아래 형태의 JSON 객체 하나만 출력합니다.
 			updates에는 이번 메시지에서 새로 알게 된 값만 넣고, 모르는 항목은 키를 생략합니다.
 			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false}
+			부위별 증상 점수는 conditions에 부위와 점수를 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위와 증상의 점수로 넣습니다.
+			{"understood": true, "reply": "다른 증상도 있으신가요?", "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]}, "finished": false}
 			""".formatted(today, draft.toPromptJson(jsonMapper), draft.pendingFields());
 	}
 
