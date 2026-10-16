@@ -183,6 +183,31 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 부위를_키로_쓴_증상_점수도_같은_뜻으로_반영한다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("""
+			{"understood": true, "reply": "다른 증상도 있으신가요?",
+			 "updates": {"conditions": {"FACE": {"itching": 8}}}}""");
+
+		mockMvc.perform(sendMessage(bearer, session, "8"))
+			.andExpect(jsonPath("$.data.understood").value(true))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("FACE"))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.itching").value(8));
+	}
+
+	@Test
+	void 프롬프트가_부위별_점수의_출력_형식을_안내한다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("{\"understood\": true, \"reply\": \"고통은 몇 점인가요?\", \"updates\": {}}");
+		mockMvc.perform(sendMessage(bearer, session, "안녕하세요"));
+
+		assertThat(llm.lastSystemPrompt())
+			.contains("\"conditions\": [{\"bodyPart\": \"FACE\", \"symptoms\": {\"itching\": 8}}]");
+	}
+
+	@Test
 	void 프롬프트가_증상_점수를_일정한_문구로_하나씩_묻도록_안내한다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
