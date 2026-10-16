@@ -30,7 +30,7 @@ jobs:
 
       - name: 백엔드 테스트
         working-directory: backend
-        run: ./gradlew test
+        run: chmod +x gradlew && ./gradlew test
 
       - uses: actions/setup-node@v4
         with:
