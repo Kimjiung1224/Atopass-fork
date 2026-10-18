@@ -1242,7 +1242,7 @@ components:
               maximum: 5
               nullable: true
               readOnly: true
-              description: 수면 점수(서버가 수면 시간으로 계산). 7~9시간이 5점이고 그 범위에서 2시간 벗어날 때마다 1점 감점, 최저 1점. 수면 시간이 없으면 null
+              description: 수면 점수(서버가 수면 시간으로 계산). 7~8시간이 5점이고 그 범위에서 2시간 벗어날 때마다 1점 감점, 최저 1점. 수면 시간이 없으면 null
               example: 4
             photos:
               type: array

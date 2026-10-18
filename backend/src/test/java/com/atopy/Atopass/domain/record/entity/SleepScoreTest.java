@@ -11,16 +11,16 @@ class SleepScoreTest {
 
 	@ParameterizedTest
 	@CsvSource({
-		"7, 5", "8, 5", "9, 5",
+		"7, 5", "7.5, 5", "8, 5",
 		"6.9, 4", "5, 4",
 		"4.9, 3", "3, 3",
 		"2.9, 2", "1, 2",
 		"0.9, 1", "0, 1",
-		"9.1, 4", "11, 4",
-		"11.1, 3", "13, 3",
+		"8.1, 4", "10, 4",
+		"10.1, 3", "12, 3",
 		"24, 1"
 	})
-	void 칠에서_구시간이_5점이고_2시간_벗어날_때마다_1점씩_깎인다(String hours, int expected) {
+	void 칠에서_팔시간이_5점이고_2시간_벗어날_때마다_1점씩_깎인다(String hours, int expected) {
 		assertThat(SleepScore.of(new BigDecimal(hours))).isEqualTo(expected);
 	}
 
