@@ -16,6 +16,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 /** 대화 메시지. 생성 30일 뒤 삭제한다. */
 @Getter
@@ -40,11 +41,21 @@ public class ChatMessage extends BaseTimeEntity {
 	@Column(nullable = false, columnDefinition = "text")
 	private String content;
 
+	/** 선택지 버튼으로 보낸 메시지. LLM을 부르지 않으므로 이용 한도에 세지 않는다. */
+	@ColumnDefault("false")
+	@Column(name = "via_choice", nullable = false)
+	private boolean viaChoice;
+
 	public static ChatMessage of(ChatSession session, ChatRole role, String content) {
+		return of(session, role, content, false);
+	}
+
+	public static ChatMessage of(ChatSession session, ChatRole role, String content, boolean viaChoice) {
 		ChatMessage message = new ChatMessage();
 		message.session = session;
 		message.role = role;
 		message.content = content;
+		message.viaChoice = viaChoice;
 		return message;
 	}
 

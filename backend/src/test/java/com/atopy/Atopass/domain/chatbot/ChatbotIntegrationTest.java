@@ -97,7 +97,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.reply").value("어제 몇 시간 주무셨나요?"))
+			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"))
+			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
@@ -159,7 +160,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "그만할래요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
-			.andExpect(jsonPath("$.data.reply").value("고통은 몇 점인가요?"));
+			.andExpect(jsonPath("$.data.reply").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"));
 	}
 
 	@Test
@@ -218,7 +219,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		assertThat(llm.lastSystemPrompt())
 			.contains("{증상} 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
 			.contains("한 번에 하나씩 차례로 묻습니다")
-			.contains("다른 증상도 있으신가요?");
+			.contains("followUp을 true로");
 	}
 
 	@Test
@@ -260,13 +261,13 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepHours\": 8}}");
 		mockMvc.perform(sendMessage(bearer, session, "8시간"))
 			.andExpect(jsonPath("$.data.draft.sleepScore").value(5))
-			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요? '예' 또는 '아니오'로 답해 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
 		mockMvc.perform(sendMessage(bearer, session, "예"))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"PAPULE\"]}}");
 		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
-			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'라고 말씀해 주세요."));
+			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
 		mockMvc.perform(sendMessage(bearer, session, "새 보습제를 썼어요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
@@ -365,7 +366,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].role").value("USER"))
 			.andExpect(jsonPath("$.data.messages[0].content").value("기록할게요"))
 			.andExpect(jsonPath("$.data.messages[1].role").value("ASSISTANT"))
-			.andExpect(jsonPath("$.data.messages[1].content").value("고통은 몇 점인가요?"))
+			.andExpect(jsonPath("$.data.messages[1].content").value("오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)"))
 			.andExpect(jsonPath("$.data.messages[3].content").value("몇 점인가요?"))
 			.andExpect(jsonPath("$.data.messages[0].createdAt").isNotEmpty());
 	}

@@ -162,7 +162,7 @@ function RecordSummary({ date }: { date: string }) {
         <FieldError errors={fieldErrors} prefix="skinSigns" />
       </Section>
 
-      <Section title="부위별 증상 점수">
+      <Section title="부위별 고통 점수">
         <SkinConditionEditor
           value={form.skinConditions}
           onChange={(skinConditions) => setForm({ ...form, skinConditions })}

@@ -178,6 +178,7 @@ Table chatbot_messages {
   session_id varchar(36) [not null]
   role chat_role [not null]
   content text [not null]
+  via_choice boolean [not null, default: false, note: '선택지 버튼으로 보낸 답. 이용 한도에 세지 않음']
   created_at datetime [not null, default: `now()`, note: '30일 뒤 삭제']
 
   indexes {
