@@ -19,8 +19,9 @@ class ChatReplyParser {
 	 * @param reply      사용자에게 보여줄 문장. 없으면 null
 	 * @param updates    이번 메시지에서 새로 알게 된 값. 없으면 null
 	 * @param finished   사용자가 입력을 마치려 하는지
+	 * @param followUp   reply가 부위나 증상 점수를 되묻는 질문인지
 	 */
-	record ModelOutput(boolean understood, String reply, JsonNode updates, boolean finished) {
+	record ModelOutput(boolean understood, String reply, JsonNode updates, boolean finished, boolean followUp) {
 	}
 
 	private final JsonMapper jsonMapper;
@@ -45,7 +46,8 @@ class ChatReplyParser {
 				: null;
 			JsonNode updates = root.path("updates").isObject() ? root.path("updates") : null;
 			boolean finished = root.path("finished").isBoolean() && root.path("finished").booleanValue();
-			return Optional.of(new ModelOutput(understood, reply, updates, finished));
+			boolean followUp = root.path("followUp").isBoolean() && root.path("followUp").booleanValue();
+			return Optional.of(new ModelOutput(understood, reply, updates, finished, followUp));
 		} catch (RuntimeException e) {
 			return Optional.empty();
 		}

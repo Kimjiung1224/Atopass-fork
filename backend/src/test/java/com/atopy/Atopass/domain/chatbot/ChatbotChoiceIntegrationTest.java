@@ -1,0 +1,288 @@
+package com.atopy.Atopass.domain.chatbot;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.atopy.Atopass.support.ApiTestSupport;
+import com.atopy.Atopass.support.FakeChatModelClient;
+import com.atopy.Atopass.support.FakeLlmConfig;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+/**
+ * POST /chatbot/sessions/{sessionId}/choices, /finish : 선택지 버튼으로 답하는 항목은 LLM을 거치지 않고 바로 반영한다.
+ * 서버가 지금 묻는 항목(askingField)을 정하고, 그 항목에만 답할 수 있다.
+ */
+@Import(FakeLlmConfig.class)
+class ChatbotChoiceIntegrationTest extends ApiTestSupport {
+
+	private static final String AUTH = HttpHeaders.AUTHORIZATION;
+	private static final String PAIN_QUESTION = "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
+	private static final String SLEEP_QUESTION = "어젯밤 몇 시간 주무셨나요?";
+
+	@Autowired
+	FakeChatModelClient llm;
+
+	@BeforeEach
+	void resetLlm() {
+		llm.reset();
+	}
+
+	@Test
+	void 새_세션은_고통_지수를_먼저_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"));
+	}
+
+	@Test
+	void 선택지로_모두_답하면_LLM을_부르지_않고_확인_단계로_넘어간다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 6))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.understood").value(true))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
+			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
+			.andExpect(jsonPath("$.data.reply").value(SLEEP_QUESTION));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7.5))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(7.5))
+			.andExpect(jsonPath("$.data.askingField").value("medication"))
+			.andExpect(jsonPath("$.data.reply").value("오늘 약을 복용하셨나요?"));
+		mockMvc.perform(choice(bearer, session, "medication", false))
+			.andExpect(jsonPath("$.data.draft.medication").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+		mockMvc.perform(choice(bearer, session, "skinSigns", List.of("ERYTHEMA", "XEROSIS")))
+			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(2))
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+		mockMvc.perform(skip(bearer, session, "notes"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.askingField").doesNotExist())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
+			.andExpect(jsonPath("$.data.reply").value("입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요."));
+
+		assertThat(llm.callCount()).isZero();
+		// 대화 내역에는 고른 값이 사람이 읽는 말로 남는다.
+		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages.length()").value(10))
+			.andExpect(jsonPath("$.data.messages[0].content").value("6점"))
+			.andExpect(jsonPath("$.data.messages[2].content").value("7.5시간"))
+			.andExpect(jsonPath("$.data.messages[4].content").value("아니오"))
+			.andExpect(jsonPath("$.data.messages[6].content").value("피부건조증, 홍반"))
+			.andExpect(jsonPath("$.data.messages[8].content").value("없어요"));
+		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.askingField").doesNotExist());
+	}
+
+	@Test
+	void 선택_항목은_넘어갈_수_있고_증상이_없으면_빈_배열이다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(choice(bearer, session, "painIndex", 3));
+
+		mockMvc.perform(skip(bearer, session, "sleepHours"))
+			.andExpect(jsonPath("$.data.draft.sleepHours").doesNotExist())
+			.andExpect(jsonPath("$.data.askingField").value("medication"));
+		mockMvc.perform(skip(bearer, session, "medication"))
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+		mockMvc.perform(choice(bearer, session, "skinSigns", List.of()))
+			.andExpect(jsonPath("$.data.draft.skinSigns").isEmpty())
+			.andExpect(jsonPath("$.data.askingField").value("notes"));
+
+		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages[2].content").value("넘어갈게요"))
+			.andExpect(jsonPath("$.data.messages[6].content").value("없어요"));
+	}
+
+	@Test
+	void 지금_묻는_항목이_아니면_400이다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "sleepHours", 7))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+		mockMvc.perform(choice(bearer, session, "alcohol", true))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 값이_규칙에_어긋나면_400이고_초안은_그대로다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 11)).andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "painIndex", "6")).andExpect(status().isBadRequest());
+		mockMvc.perform(withJson(post(url(session, "choices")).header(AUTH, bearer), Map.of("field", "painIndex")))
+			.andExpect(status().isBadRequest());
+		mockMvc.perform(choice(bearer, session, "painIndex", 4));
+		mockMvc.perform(choice(bearer, session, "sleepHours", 25)).andExpect(status().isBadRequest());
+		mockMvc.perform(skip(bearer, session, "sleepHours"));
+		mockMvc.perform(choice(bearer, session, "medication", "yes")).andExpect(status().isBadRequest());
+		mockMvc.perform(skip(bearer, session, "medication"));
+		mockMvc.perform(choice(bearer, session, "skinSigns", List.of("RASH"))).andExpect(status().isBadRequest());
+
+		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(4))
+			.andExpect(jsonPath("$.data.draft.skinSigns").doesNotExist())
+			.andExpect(jsonPath("$.data.askingField").value("skinSigns"));
+		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages.length()").value(6));
+	}
+
+	@Test
+	void 고통_지수는_건너뛸_수_없고_특이사항은_선택지로_글을_보낼_수_없다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(skip(bearer, session, "painIndex")).andExpect(status().isBadRequest());
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 5));
+		mockMvc.perform(skip(bearer, session, "sleepHours"));
+		mockMvc.perform(skip(bearer, session, "medication"));
+		mockMvc.perform(skip(bearer, session, "skinSigns"));
+		mockMvc.perform(choice(bearer, session, "notes", "새 보습제를 썼어요")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void LLM이_다음_항목을_다른_문장으로_물어도_서버의_정해진_질문으로_바꾼다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("{\"understood\": true, \"reply\": \"약은 드셨어요?\", \"updates\": {\"painIndex\": 5}}");
+
+		mockMvc.perform(sendMessage(bearer, session, "오늘은 5점 정도예요"))
+			.andExpect(jsonPath("$.data.askingField").value("sleepHours"))
+			.andExpect(jsonPath("$.data.reply").value(SLEEP_QUESTION));
+	}
+
+	@Test
+	void LLM이_부위나_점수를_되물으면_글로_답하도록_symptoms를_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("{\"understood\": true, \"reply\": \"어느 부위가 가려우신가요?\", \"updates\": {}, \"followUp\": true}");
+
+		mockMvc.perform(sendMessage(bearer, session, "너무 가려워요"))
+			.andExpect(jsonPath("$.data.askingField").value("symptoms"))
+			.andExpect(jsonPath("$.data.reply").value("어느 부위가 가려우신가요?"));
+		// 새로고침해도 같은 상태이고, 되묻는 동안에는 선택지로 답할 수 없다.
+		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.askingField").value("symptoms"));
+		mockMvc.perform(choice(bearer, session, "painIndex", 5)).andExpect(status().isBadRequest());
+
+		llm.enqueue("{\"understood\": true, \"reply\": \"몇 점인가요?\","
+			+ " \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"itching\": 6}}]}}");
+		mockMvc.perform(sendMessage(bearer, session, "팔이요, 6점"))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
+			.andExpect(jsonPath("$.data.reply").value(PAIN_QUESTION));
+	}
+
+	@Test
+	void 부위만_말하고_점수가_없으면_LLM의_질문을_그대로_쓴다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		llm.enqueue("""
+			{"understood": true, "reply": "가려움 정도를 점수로 나타내면 0~10점 중 몇 점인가요?",
+			 "updates": {"painIndex": 4, "conditions": [{"bodyPart": "ARM"}]}}""");
+
+		mockMvc.perform(sendMessage(bearer, session, "고통 4점이고 팔이 가려워요"))
+			.andExpect(jsonPath("$.data.askingField").value("symptoms"))
+			.andExpect(jsonPath("$.data.reply").value("가려움 정도를 점수로 나타내면 0~10점 중 몇 점인가요?"));
+	}
+
+	@Test
+	void 기록_마치기는_필수_항목이_채워졌을_때만_확인_단계로_넘어간다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
+			.andExpect(jsonPath("$.data.reply").value(PAIN_QUESTION));
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 2));
+		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.askingField").doesNotExist())
+			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
+
+		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages[4].content").value("기록을 마칠게요"));
+		assertThat(llm.callCount()).isZero();
+	}
+
+	@Test
+	void 질의_모드에서는_선택지로_답할_수_없다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "QUERY");
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 5))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
+		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 저장된_세션에는_답할_수_없고_다른_회원의_세션은_404다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		String other = newMemberBearer();
+		mockMvc.perform(post("/api/v1/chatbot/consent").header(AUTH, other)).andExpect(status().isOk());
+		mockMvc.perform(choice(other, session, "painIndex", 5))
+			.andExpect(status().isNotFound())
+			.andExpect(jsonPath("$.error.code").value("SESSION_NOT_FOUND"));
+
+		mockMvc.perform(choice(bearer, session, "painIndex", 5));
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString());
+		body.put("confirmed", true);
+		body.put("record", Map.of("painIndex", 5));
+		mockMvc.perform(withJson(post(url(session, "records")).header(AUTH, bearer), body))
+			.andExpect(status().isCreated());
+
+		mockMvc.perform(skip(bearer, session, "sleepHours"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.error.code").value("SESSION_CLOSED"));
+	}
+
+	private String createSession(String bearer, String mode) throws Exception {
+		mockMvc.perform(post("/api/v1/chatbot/consent").header(AUTH, bearer)).andExpect(status().isOk());
+		String body = mockMvc.perform(withJson(post("/api/v1/chatbot/sessions").header(AUTH, bearer),
+				Map.of("mode", mode)))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		return jsonMapper.readTree(body).get("data").get("sessionId").asString();
+	}
+
+	private static String url(String session, String path) {
+		return "/api/v1/chatbot/sessions/" + session + "/" + path;
+	}
+
+	private MockHttpServletRequestBuilder choice(String bearer, String session, String field, Object value) {
+		return withJson(post(url(session, "choices")).header(AUTH, bearer), Map.of("field", field, "value", value));
+	}
+
+	private MockHttpServletRequestBuilder skip(String bearer, String session, String field) {
+		return withJson(post(url(session, "choices")).header(AUTH, bearer), Map.of("field", field, "skip", true));
+	}
+
+	private MockHttpServletRequestBuilder sendMessage(String bearer, String session, String message) {
+		return withJson(post(url(session, "messages")).header(AUTH, bearer), Map.of("message", message));
+	}
+
+}

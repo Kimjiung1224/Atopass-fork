@@ -617,7 +617,7 @@ paths:
         - 입력한 문장을 해석하지 못하거나 점수 범위(0~10)를 벗어나면 오류가 아니라 `200`으로 같은 내용을 다시 묻고 `understood: false`를 내려준다. 3번 연속 실패하면 입력 예시를 안내한다.
         - `message`가 비었거나 500자를 넘으면 `400 INVALID_INPUT`.
         - 이미 기록을 저장해 닫힌 세션이면 `409 SESSION_CLOSED`.
-        - 최근 24시간 동안 보낸 메시지가 한도(기본 100회)에 도달하면 `429 CHAT_LIMIT_EXCEEDED`. LLM을 호출하기 전에 막고, 오래된 메시지가 24시간을 지나면 다시 쓸 수 있다. 프론트는 안내 문구를 보여주고 총정리 화면에서 직접 입력하도록 안내한다.
+        - 최근 24시간 동안 글로 보낸 메시지가 한도(기본 100회)에 도달하면 `429 CHAT_LIMIT_EXCEEDED`. 선택지 답(`/choices`, `/finish`)은 세지 않는다. LLM을 호출하기 전에 막고, 오래된 메시지가 24시간을 지나면 다시 쓸 수 있다. 프론트는 안내 문구를 보여주고 총정리 화면에서 직접 입력하도록 안내한다.
         - 챗봇 처리(외부 LLM 등) 장애는 `503 CHATBOT_UNAVAILABLE`. 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
       requestBody:
         required: true
@@ -695,6 +695,123 @@ paths:
         '404':
           $ref: '#/components/responses/SessionNotFound'
 
+  /chatbot/sessions/{sessionId}/choices:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Chatbot]
+      summary: 챗봇 선택지 답
+      description: |
+        선택지 버튼으로 고른 답을 보낸다. LLM을 부르지 않고 초안에 바로 반영하며, 다음 질문은 서버의 정해진 문장이다.
+        이용 한도(`CHAT_LIMIT_EXCEEDED`)에 세지 않으므로 한도에 도달해도 보낼 수 있다.
+        대화 내역에는 고른 값이 "6점", "7.5시간", "예", "피부건조증, 홍반", "넘어갈게요" 같은 문장으로 남는다.
+
+        - 지금 묻는 항목(`askingField`)에만 답할 수 있다. 다른 항목이면 `400 INVALID_INPUT`.
+        - `skip: true`는 "넘어갈게요"(특이사항은 "없어요")다. 고통 지수는 건너뛸 수 없다.
+        - 특이사항은 글(`/messages`)로 받으므로 선택지로는 `skip`만 보낼 수 있다.
+        - 값이 범위나 형식에 어긋나면 `400 INVALID_INPUT`이고 초안은 바뀌지 않는다.
+        - 질의 모드 세션이면 `400 INVALID_INPUT`, 닫힌 세션이면 `409 SESSION_CLOSED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field]
+              properties:
+                field:
+                  type: string
+                  enum: [painIndex, sleepHours, medication, skinSigns, notes]
+                value:
+                  description: |
+                    painIndex는 0~10 정수, sleepHours는 0~24 숫자(소수점 한 자리), medication은 boolean,
+                    skinSigns는 SkinSign 배열(빈 배열이면 "증상 없음"). skip이 true이면 보내지 않는다.
+                  oneOf:
+                    - type: integer
+                    - type: number
+                    - type: boolean
+                    - type: array
+                      items:
+                        type: string
+                        enum: [XEROSIS, ERYTHEMA, SCALING, PAPULE, EXCORIATION, NODULE, LICHENIFICATION]
+                skip:
+                  type: boolean
+                  default: false
+            examples:
+              painIndex:
+                value: { field: painIndex, value: 6 }
+              skinSigns:
+                value: { field: skinSigns, value: [XEROSIS, ERYTHEMA] }
+              skip:
+                value: { field: sleepHours, skip: true }
+      responses:
+        '200':
+          description: 챗봇 응답 (메시지 전송과 같은 형식)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChatReply'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ConsentRequired'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+        '409':
+          description: 이미 기록을 저장해 닫힌 세션 (`SESSION_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /chatbot/sessions/{sessionId}/finish:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Chatbot]
+      summary: 챗봇 기록 마치기
+      description: |
+        "기록 마치기" 버튼. 필수 항목(고통 지수, 말한 부위의 증상 점수)이 채워졌으면 남은 선택 항목을 묻지 않고
+        확인 단계(`requiresConfirmation: true`)로 넘어간다. 채워지지 않았으면 그 항목을 다시 묻는다.
+        LLM을 부르지 않으며 이용 한도에 세지 않는다. 대화 내역에는 "기록을 마칠게요"로 남는다.
+      responses:
+        '200':
+          description: 챗봇 응답 (메시지 전송과 같은 형식)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChatReply'
+        '400':
+          description: 질의 모드 세션 (`INVALID_INPUT`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ConsentRequired'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+        '409':
+          description: 이미 기록을 저장해 닫힌 세션 (`SESSION_CLOSED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /chatbot/sessions/{sessionId}/draft:
     parameters:
       - $ref: '#/components/parameters/SessionId'
@@ -704,7 +821,7 @@ paths:
       description: |
         세션에 쌓인 기록 초안과 진행 상태를 준다. 새로고침·재진입으로 마지막 메시지 응답의 `draft`를 잃었을 때
         일일 총정리 화면이 초안을 다시 채우는 용도다. 값은 마지막 메시지 응답의 `draft`, `pendingFields`,
-        `requiresConfirmation`과 같다.
+        `askingField`, `requiresConfirmation`과 같다.
       responses:
         '200':
           description: 조회 성공
@@ -1470,6 +1587,16 @@ components:
             type: string
             enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
           example: [sleepHours, medication, skinSigns, notes]
+        askingField:
+          type: string
+          nullable: true
+          description: |
+            지금 묻는 항목. 서버가 정하며, 화면은 이 값에 맞춰 선택지를 보여 준다.
+            painIndex(0~10 버튼), sleepHours(시간 선택), medication(예/아니오), skinSigns(여러 개 선택)는
+            `POST /chatbot/sessions/{sessionId}/choices`로 답하고, symptoms(부위·증상 점수)와 notes(특이사항)는 글로 답한다.
+            확인 단계이거나 질의 모드면 null.
+          enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
+          example: sleepHours
         requiresConfirmation:
           type: boolean
           description: true이면 기록 초안을 확인하는 단계(총정리)로 넘어간다.
@@ -1565,6 +1692,11 @@ components:
           items:
             type: string
             enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
+        askingField:
+          type: string
+          nullable: true
+          description: 마지막 메시지 응답과 같은 값. 확인 단계면 null.
+          enum: [painIndex, symptoms, sleepHours, medication, skinSigns, notes]
         requiresConfirmation:
           type: boolean
           description: 마지막 메시지 응답과 같은 값. 새로고침 뒤에도 유지된다.

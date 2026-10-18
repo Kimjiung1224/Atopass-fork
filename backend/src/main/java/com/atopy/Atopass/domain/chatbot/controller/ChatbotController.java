@@ -1,5 +1,6 @@
 package com.atopy.Atopass.domain.chatbot.controller;
 
+import com.atopy.Atopass.domain.chatbot.dto.request.ChatChoiceRequest;
 import com.atopy.Atopass.domain.chatbot.dto.request.ChatMessageRequest;
 import com.atopy.Atopass.domain.chatbot.dto.request.ChatRecordSaveRequest;
 import com.atopy.Atopass.domain.chatbot.dto.request.CreateSessionRequest;
@@ -41,6 +42,20 @@ public class ChatbotController {
 		@CurrentMember Long memberId, @PathVariable String sessionId,
 		@Valid @RequestBody ChatMessageRequest request) {
 		return ApiResponse.ok(chatbotService.sendMessage(memberId, sessionId, request.message().trim()));
+	}
+
+	/** 선택지 버튼으로 고른 답. LLM을 부르지 않으므로 이용 한도에 세지 않는다. */
+	@PostMapping("/{sessionId}/choices")
+	public ApiResponse<ChatReplyResponse> answerChoice(
+		@CurrentMember Long memberId, @PathVariable String sessionId,
+		@Valid @RequestBody ChatChoiceRequest request) {
+		return ApiResponse.ok(chatbotService.answerChoice(memberId, sessionId, request));
+	}
+
+	/** "기록 마치기" 버튼. 필수 항목이 채워졌으면 확인 단계로 넘어간다. */
+	@PostMapping("/{sessionId}/finish")
+	public ApiResponse<ChatReplyResponse> finish(@CurrentMember Long memberId, @PathVariable String sessionId) {
+		return ApiResponse.ok(chatbotService.finish(memberId, sessionId));
 	}
 
 	@GetMapping("/{sessionId}/messages")

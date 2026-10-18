@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
@@ -7,6 +8,7 @@ import PendingFieldList from '@/components/chatbot/PendingFieldList';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
+import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
 import { formatKoreanDate, today } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
@@ -16,13 +18,35 @@ import { recordPath } from '@/utils/routes';
 export default function ChatbotPage() {
   const navigate = useNavigate();
   const recordDate = today();
-  const { messages, pendingFields, requiresConfirmation, status, error, limitReached, send, agree, retry } =
-    useChatSession(recordDate);
+  const {
+    messages,
+    pendingFields,
+    askingField,
+    requiresConfirmation,
+    status,
+    error,
+    limitReached,
+    send,
+    choose,
+    finish,
+    agree,
+    retry,
+  } = useChatSession(recordDate);
   const draft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   const goToSummary = () => navigate(recordPath(recordDate));
+
+  // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
+  // 첫 화면에서는 고통 지수 버튼과 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
+  // (LLM이 응답하지 못해도 버튼만으로 끝까지 기록할 수 있다)
+  const started = messages.length > 0;
+  const choiceField: ChoiceField | null =
+    !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
+  const textLocked = started && choiceField !== null && choiceField !== 'notes';
+  const canFinish =
+    started && !requiresConfirmation && !pendingFields.includes('painIndex') && !pendingFields.includes('symptoms');
 
   // 이 날짜의 대화가 이미 기록으로 저장됐으면 총정리(수정)로 보낸다
   useEffect(() => {
@@ -34,6 +58,16 @@ export default function ChatbotPage() {
     const result = await send(text);
     if (result.ok) return;
     setInput(text); // 실패하면 입력한 내용을 유지한다
+    if (result.closed) goToSummary();
+  };
+
+  const handleChoose = async (choice: ChatChoiceRequest) => {
+    const result = await choose(choice);
+    if (result.closed) goToSummary();
+  };
+
+  const handleFinish = async () => {
+    const result = await finish();
     if (result.closed) goToSummary();
   };
 
@@ -65,6 +99,23 @@ export default function ChatbotPage() {
       </div>
 
       {!requiresConfirmation && <PendingFieldList fields={pendingFields} />}
+
+      {canFinish && (
+        <div className="flex justify-end px-3 pb-1">
+          <button
+            type="button"
+            onClick={() => void handleFinish()}
+            disabled={status !== 'ready'}
+            className="text-sm font-semibold text-emerald-700 underline underline-offset-2 disabled:opacity-40"
+          >
+            남은 항목 건너뛰고 기록 마치기
+          </button>
+        </div>
+      )}
+
+      {choiceField && (status === 'ready' || status === 'sending') && (
+        <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
+      )}
 
       {requiresConfirmation && (
         <div className="border-t border-emerald-100 bg-emerald-50 p-3">
@@ -112,6 +163,7 @@ export default function ChatbotPage() {
         onSubmit={handleSubmit}
         onAttachPhotos={handleAttach}
         disabled={status !== 'ready'}
+        textLocked={textLocked}
       />
 
       {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}

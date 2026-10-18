@@ -50,6 +50,25 @@ class ChatRateLimitIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 선택지_답은_한도에_세지_않고_한도에_도달해도_보낼_수_있다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer);
+		mockMvc.perform(choice(bearer, session, Map.of("field", "painIndex", "value", 5))).andExpect(status().isOk());
+		mockMvc.perform(choice(bearer, session, Map.of("field", "sleepHours", "skip", true))).andExpect(status().isOk());
+
+		for (int i = 1; i <= 3; i++) {
+			mockMvc.perform(send(bearer, session, "메시지 " + i)).andExpect(status().isOk());
+		}
+		mockMvc.perform(send(bearer, session, "하나 더")).andExpect(status().isTooManyRequests());
+
+		mockMvc.perform(choice(bearer, session, Map.of("field", "medication", "value", true)))
+			.andExpect(status().isOk());
+		mockMvc.perform(post("/api/v1/chatbot/sessions/" + session + "/finish").header(AUTH, bearer))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+	}
+
+	@Test
 	void 다른_회원의_사용량은_섞이지_않는다() throws Exception {
 		String heavy = newMemberBearer();
 		String heavySession = createSession(heavy);
@@ -86,6 +105,10 @@ class ChatRateLimitIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isCreated())
 			.andReturn().getResponse().getContentAsString();
 		return jsonMapper.readTree(body).get("data").get("sessionId").asString();
+	}
+
+	private MockHttpServletRequestBuilder choice(String bearer, String session, Map<String, Object> body) {
+		return withJson(post("/api/v1/chatbot/sessions/" + session + "/choices").header(AUTH, bearer), body);
 	}
 
 	private MockHttpServletRequestBuilder send(String bearer, String session, String message) {

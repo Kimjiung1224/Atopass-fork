@@ -62,6 +62,10 @@ export const CHAT_MESSAGE_MAX_LENGTH = 500;
 export const CHAT_NOTES_MAX_LENGTH = 500;
 export const NOTES_MAX_LENGTH = 2000;
 
+/** 챗봇 수면 시간 선택지 — 0~12시간, 1시간 단위 */
+export const CHAT_SLEEP_HOURS_OPTIONS = Array.from({ length: 13 }, (_, i) => i);
+export const CHAT_SLEEP_HOURS_DEFAULT = 7;
+
 /** 챗봇 응답 pendingFields → "남은 항목" 표시 문구 */
 export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   painIndex: '고통 지수',

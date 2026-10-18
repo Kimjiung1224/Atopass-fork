@@ -1,5 +1,6 @@
 import type { ApiSuccess } from '@/types/api';
 import type {
+  ChatChoiceRequest,
   ChatConsent,
   ChatDraftState,
   ChatMessagesResponse,
@@ -24,6 +25,16 @@ export const chatbotApi = {
     client
       .post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/messages`, { message })
       .then(unwrap),
+
+  /** 선택지로 고른 답. LLM을 부르지 않는다 */
+  sendChoice: (sessionId: string, body: ChatChoiceRequest) =>
+    client
+      .post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/choices`, body)
+      .then(unwrap),
+
+  /** "기록 마치기" — 필수 항목(고통 지수)이 채워졌으면 확인 단계로 넘어간다 */
+  finish: (sessionId: string) =>
+    client.post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/finish`).then(unwrap),
 
   getMessages: (sessionId: string) =>
     client.get<ApiSuccess<ChatMessagesResponse>>(`/chatbot/sessions/${sessionId}/messages`).then(unwrap),

@@ -29,13 +29,13 @@ class ChatPromptFactory {
 			사용자가 말한 내용만 기록하고, 사용자가 말하지 않은 값은 절대 추측하거나 채우지 않습니다.
 
 			[질문할 항목] 아래 순서대로 하나씩 묻습니다.
+			   이 항목들은 앱이 정해진 문장과 선택지 버튼으로 직접 묻습니다. 당신은 사용자가 글로 쓴 말에서 값을 뽑습니다.
 			1. 고통 지수(painIndex): 오늘 피부 때문에 느낀 고통의 정도. 0~10 정수 (0은 없음, 10은 매우 심함, 사용자가 느끼는 주관적인 정도).
 			   사용자가 숫자를 말하지 않았다면 점수를 정하지 말고, 0~10 중 몇 점인지 물어보세요.
 			2. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
 			3. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
 			4. 나타난 증상(skinSigns): 아래 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
 			   XEROSIS(피부건조증), ERYTHEMA(홍반), SCALING(각질), PAPULE(구진), EXCORIATION(긁은 자국), NODULE(결절), LICHENIFICATION(태선화)
-			   물어볼 때는 "1 피부건조증, 2 홍반, 3 각질, 4 구진, 5 긁은 자국, 6 결절, 7 태선화"처럼 번호와 함께 보여 주고, 번호로 답해도 알아듣습니다.
 			5. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
 
 			[묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
@@ -60,15 +60,14 @@ class ChatPromptFactory {
 			8. 사용자가 증상만 말하고 점수를 말하지 않았다면, 그 증상의 점수를 반드시 다음 문장으로 묻습니다.
 			   "{증상} 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "가려움 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
 			   증상을 여러 개 말했다면 한 번에 하나씩 차례로 묻습니다. 부위를 모르면 증상 점수보다 부위를 먼저 묻습니다.
-			9. 점수를 받은 뒤에는 남은 증상을 하나하나 나열하지 말고 "다른 증상도 있으신가요?"처럼 짧게 묻습니다.
-			   사용자가 새 증상을 말하면 8번대로 그 증상의 점수를 묻습니다.
+			9. reply가 부위나 증상 점수를 되묻는 질문이면 followUp을 true로 합니다. 그 밖의 항목은 앱이 묻으므로 followUp은 false입니다.
 
 			[출력 형식]
 			설명이나 코드블록 없이 아래 형태의 JSON 객체 하나만 출력합니다.
 			updates에는 이번 메시지에서 새로 알게 된 값만 넣고, 모르는 항목은 키를 생략합니다.
-			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false}
+			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false, "followUp": false}
 			부위별 증상 점수는 conditions에 부위와 점수를 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위와 증상의 점수로 넣습니다.
-			{"understood": true, "reply": "다른 증상도 있으신가요?", "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]}, "finished": false}
+			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]}, "finished": false, "followUp": false}
 			""".formatted(today, draft.toPromptJson(jsonMapper), draft.pendingFields());
 	}
 

@@ -17,7 +17,7 @@ export default function ChatMessageList({ messages, typing }: Props) {
     <div className="flex flex-col gap-3 px-4 py-4" aria-live="polite">
       {messages.length === 0 && (
         <ChatBubble role="ASSISTANT">
-          오늘 피부 상태는 어땠나요? 편하게 말씀해 주세요.
+          오늘 피부 상태는 어땠나요? 편하게 말씀해 주시거나, 아래에서 오늘 느낀 고통 지수를 골라 주세요.
           {'\n'}예) "오늘 팔이 많이 가렵고 잠은 6시간 잤어"
         </ChatBubble>
       )}

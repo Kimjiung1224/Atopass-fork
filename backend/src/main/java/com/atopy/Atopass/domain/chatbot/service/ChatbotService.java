@@ -1,9 +1,11 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
+import com.atopy.Atopass.domain.chatbot.dto.request.ChatChoiceRequest;
 import com.atopy.Atopass.domain.chatbot.dto.request.ChatRecordSaveRequest;
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatDraftStateResponse;
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatMessagesResponse;
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatReplyResponse;
+import com.atopy.Atopass.domain.chatbot.dto.response.ChatDraftResponse;
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatSessionResponse;
 import com.atopy.Atopass.domain.chatbot.entity.ChatMode;
 import com.atopy.Atopass.domain.chatbot.entity.ChatRole;
@@ -13,21 +15,29 @@ import com.atopy.Atopass.domain.chatbot.llm.LlmProperties;
 import com.atopy.Atopass.domain.chatbot.service.ChatReplyParser.ModelOutput;
 import com.atopy.Atopass.domain.chatbot.service.ChatSessionService.TurnContext;
 import com.atopy.Atopass.domain.record.dto.response.RecordCreatedResponse;
+import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.global.exception.BusinessException;
 import com.atopy.Atopass.global.exception.ErrorCode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * 챗봇 대화 흐름을 조율한다.
  * 이 클래스는 트랜잭션을 열지 않는다. 오래 걸리는 LLM 호출 동안 DB 연결을 붙잡지 않도록
  * DB 작업은 {@link ChatSessionService}의 짧은 트랜잭션으로 앞뒤에서 처리한다.
  * LLM 호출이 실패하면(CHATBOT_UNAVAILABLE) 사용자의 입력은 저장하지 않으므로 같은 요청을 다시 보내도 된다.
+ *
+ * <p>기록 모드에서 고통 지수·수면 시간·약 복용·나타난 증상·특이사항은 서버가 정해진 문장으로 묻고,
+ * 화면은 선택지로 답을 받는다({@link #answerChoice}). 선택지 답은 LLM을 거치지 않고 초안에 바로 반영한다.
+ * LLM의 질문 문장은 부위나 증상 점수를 되물을 때만 쓴다.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +52,10 @@ public class ChatbotService {
 	static final String PAIN_INDEX_OUT_OF_RANGE = "고통 지수는 0~10 사이 숫자로 알려 주세요. (0은 없음, 10은 매우 심함)";
 	static final String CONFIRM = "입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요.";
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
+	static final String FINISH_TEXT = "기록을 마칠게요";
+
+	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
+	private static final Set<String> CHOICE_FIELDS = Set.of("painIndex", "sleepHours", "medication", "skinSigns", "notes");
 
 	private final ChatConsentService consentService;
 	private final ChatSessionService sessionService;
@@ -81,8 +95,81 @@ public class ChatbotService {
 			: queryOutcome(context, raw);
 
 		sessionService.saveTurn(sessionId, userText, outcome.response().reply(),
-			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation());
+			outcome.draftJson(), outcome.failCount(), outcome.response().requiresConfirmation(), false);
 		return outcome.response();
+	}
+
+	/**
+	 * 선택지로 고른 답을 반영한다. LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 * 지금 묻는 항목(askingField)이 아니거나 값이 규칙에 어긋나면 400 INVALID_INPUT이다.
+	 */
+	public ChatReplyResponse answerChoice(Long memberId, String sessionId, ChatChoiceRequest request) {
+		consentService.requireConsent(memberId);
+		TurnContext context = loadRecordTurn(memberId, sessionId);
+		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
+
+		String field = request.field();
+		if (!CHOICE_FIELDS.contains(field) || !field.equals(draft.askingField())) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "지금 고를 수 있는 항목이 아닙니다.");
+		}
+		ObjectNode updates = jsonMapper.createObjectNode();
+		if (request.skipped()) {
+			if (!ChatDraft.skippable(field)) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "건너뛸 수 없는 항목입니다.");
+			}
+			updates.putArray("skipped").add(field);
+		} else {
+			// 특이사항은 글로 받는다. 선택지로는 "없어요"(skip)만 고를 수 있다.
+			if (request.value() == null || "notes".equals(field)) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 없습니다.");
+			}
+			updates.set(field, jsonMapper.valueToTree(request.value()));
+		}
+		if (draft.apply(updates) != ChatDraft.ApplyResult.OK) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		draft.markFollowUp(false);
+		return choiceTurn(context, draft, choiceText(field, request.skipped(), draft.toResponse()), false);
+	}
+
+	/** "기록 마치기" 버튼. 필수 항목이 채워졌으면 남은 선택 항목을 묻지 않고 확인 단계로 넘어간다. */
+	public ChatReplyResponse finish(Long memberId, String sessionId) {
+		consentService.requireConsent(memberId);
+		TurnContext context = loadRecordTurn(memberId, sessionId);
+		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
+		draft.markFollowUp(false);
+		return choiceTurn(context, draft, FINISH_TEXT, true);
+	}
+
+	private TurnContext loadRecordTurn(Long memberId, String sessionId) {
+		TurnContext context = sessionService.loadForTurn(memberId, sessionId);
+		if (context.mode() != ChatMode.RECORD) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "질의 모드 대화에서는 선택지로 답할 수 없습니다.");
+		}
+		return context;
+	}
+
+	private ChatReplyResponse choiceTurn(TurnContext context, ChatDraft draft, String userText, boolean finished) {
+		boolean ready = draft.readyForConfirmation(finished);
+		String reply = ready ? CONFIRM : question(draft.askingField());
+		ChatReplyResponse response = new ChatReplyResponse(
+			reply, true, draft.pendingFields(), ready ? null : draft.askingField(), ready, draft.toResponse());
+		sessionService.saveTurn(context.sessionId(), userText, reply, draft.toJson(jsonMapper), 0, ready, true);
+		return response;
+	}
+
+	/** 대화 내역에 남길 사용자 말. 화면이 버튼을 누르자마자 보여 주는 문장과 같다. */
+	private static String choiceText(String field, boolean skip, ChatDraftResponse draft) {
+		if (skip) {
+			return "notes".equals(field) ? "없어요" : "넘어갈게요";
+		}
+		return switch (field) {
+			case "painIndex" -> draft.painIndex() + "점";
+			case "sleepHours" -> draft.sleepHours().stripTrailingZeros().toPlainString() + "시간";
+			case "medication" -> Boolean.TRUE.equals(draft.medication()) ? "예" : "아니오";
+			default -> draft.skinSigns().isEmpty() ? "없어요"
+				: draft.skinSigns().stream().map(SkinSign::label).collect(Collectors.joining(", "));
+		};
 	}
 
 	/** 최근 24시간 동안 보낸 메시지가 한도에 도달했으면 LLM을 부르기 전에 막는다. (비용 보호) */
@@ -97,10 +184,15 @@ public class ChatbotService {
 	public ChatDraftStateResponse draft(Long memberId, String sessionId) {
 		ChatSessionService.DraftState state = sessionService.draftState(memberId, sessionId);
 		ChatDraft draft = ChatDraft.fromJson(jsonMapper, state.draftJson());
-		return new ChatDraftStateResponse(draft.toResponse(), draft.pendingFields(), state.confirmationReady());
+		boolean ready = state.confirmationReady();
+		return new ChatDraftStateResponse(
+			draft.toResponse(), draft.pendingFields(), ready ? null : draft.askingField(), ready);
 	}
 
-	/** 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다. */
+	/**
+	 * 기록 모드: 응답을 검증한 뒤에만 초안에 반영하고, 반영 결과에 따라 다음 질문을 정한다.
+	 * 다음에 물을 항목이 선택지로 답하는 항목이면 화면의 선택지와 어긋나지 않도록 서버의 정해진 문장으로 묻는다.
+	 */
 	private Outcome recordOutcome(TurnContext context, ChatDraft draft, String raw) {
 		Optional<ModelOutput> parsed = replyParser.parse(raw);
 
@@ -114,6 +206,7 @@ public class ChatbotService {
 					understood = true;
 					reply = output.reply();
 					finished = output.finished();
+					draft.markFollowUp(output.followUp() && output.reply() != null);
 				}
 				case INVALID_SCORE -> reply = SCORE_OUT_OF_RANGE;
 				case INVALID_PAIN_INDEX -> reply = PAIN_INDEX_OUT_OF_RANGE;
@@ -131,12 +224,12 @@ public class ChatbotService {
 			reply = failCount >= EXAMPLE_AFTER_FAILURES ? message + EXAMPLE : message;
 		} else if (readyForConfirmation) {
 			reply = CONFIRM;
-		} else if (reply == null) {
-			reply = fallbackQuestion(draft.pendingFields());
+		} else if (reply == null || !"symptoms".equals(draft.askingField())) {
+			reply = question(draft.askingField());
 		}
 
-		ChatReplyResponse response = new ChatReplyResponse(
-			reply, understood, draft.pendingFields(), readyForConfirmation, draft.toResponse());
+		ChatReplyResponse response = new ChatReplyResponse(reply, understood, draft.pendingFields(),
+			readyForConfirmation ? null : draft.askingField(), readyForConfirmation, draft.toResponse());
 		return new Outcome(response, draft.toJson(jsonMapper), failCount);
 	}
 
@@ -150,23 +243,22 @@ public class ChatbotService {
 		int failCount = understood ? 0 : context.failCount() + 1;
 		String reply = understood ? text
 			: (failCount >= EXAMPLE_AFTER_FAILURES ? NOT_UNDERSTOOD + " 예: \"이번 주 가려움은 어땠어?\"" : NOT_UNDERSTOOD);
-		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), false, null);
+		ChatReplyResponse response = new ChatReplyResponse(reply, understood, List.of(), null, false, null);
 		return new Outcome(response, context.draftJson(), failCount);
 	}
 
-	/** LLM이 질문을 주지 않았을 때 비어 있는 항목 중 가장 먼저 필요한 것을 서버가 대신 묻는다. */
-	private String fallbackQuestion(List<String> pendingFields) {
-		if (pendingFields.isEmpty()) {
+	/** 지금 물어볼 항목의 정해진 질문. 선택지로 답하는 항목은 화면에 같은 선택지가 함께 나온다. */
+	private String question(String askingField) {
+		if (askingField == null) {
 			return CONFIRM;
 		}
-		return switch (pendingFields.get(0)) {
+		return switch (askingField) {
 			case "painIndex" -> "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
 			case "symptoms" -> "그 부위의 증상 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
-			case "medication" -> "오늘 약을 복용하셨나요? '예' 또는 '아니오'로 답해 주세요.";
-			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. "
-				+ "1 피부건조증, 2 홍반, 3 각질, 4 구진, 5 긁은 자국, 6 결절, 7 태선화 (없으면 '없어요')";
-			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'라고 말씀해 주세요.";
+			case "medication" -> "오늘 약을 복용하셨나요?";
+			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";
+			default -> "평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요.";
 		};
 	}
 
