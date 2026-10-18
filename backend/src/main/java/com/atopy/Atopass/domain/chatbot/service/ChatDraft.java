@@ -421,7 +421,7 @@ public final class ChatDraft {
 	public ChatDraftResponse toResponse() {
 		List<SkinConditionResponse> list = conditions.entrySet().stream()
 			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
-			.map(e -> new SkinConditionResponse(e.getKey(), SymptomsResponse.from(e.getValue())))
+			.map(e -> new SkinConditionResponse(e.getKey(), SymptomsResponse.from(e.getValue()), List.of()))
 			.toList();
 		return new ChatDraftResponse(
 			list,

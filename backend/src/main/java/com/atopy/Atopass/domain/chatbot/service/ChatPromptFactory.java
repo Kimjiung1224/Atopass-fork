@@ -40,7 +40,8 @@ class ChatPromptFactory {
 
 			[묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
 			- 부위별 증상 점수(conditions): 부위 FACE(얼굴), NECK(목), TRUNK(몸), RIGHT_UPPER_ARM(오른팔 상박), RIGHT_FOREARM(오른팔 하박), LEFT_UPPER_ARM(왼팔 상박), LEFT_FOREARM(왼팔 하박),
-			  GROIN(사타구니), RIGHT_THIGH(오른다리 상박), RIGHT_LOWER_LEG(오른다리 하박), LEFT_THIGH(왼다리 상박), LEFT_LOWER_LEG(왼다리 하박)와
+			  GROIN(사타구니), RIGHT_THIGH(오른다리 상박), RIGHT_LOWER_LEG(오른다리 하박), LEFT_THIGH(왼다리 상박), LEFT_LOWER_LEG(왼다리 하박),
+			  RIGHT_HAND(오른손), LEFT_HAND(왼손), RIGHT_FOOT(오른발), LEFT_FOOT(왼발), BACK(등)와
 			  증상 itching(가려움), stinging(따가움), redness(붉어짐), dryness(건조함), flaking(각질), swelling(부기), pain(통증)의 0~10 정수 점수
 			- 음주(alcohol): true 또는 false
 			- 야외활동(outdoorActivity): LOW(적음), MEDIUM(보통), HIGH(많음)

@@ -1,6 +1,6 @@
 // Swagger(openapi.yaml) components.schemas 기준
 
-/** 마네킹 부위(FACE~LEFT_LOWER_LEG, 팔·다리는 좌우·상박·하박)와 예전 부위(CHEST~FOOT) */
+/** 마네킹 부위(FACE~BACK, 팔·다리는 좌우·상박·하박, 손·발은 좌우, 등은 뒷면)와 예전 부위(CHEST~FOOT) */
 export type BodyPart =
   | 'FACE'
   | 'NECK'
@@ -14,8 +14,12 @@ export type BodyPart =
   | 'RIGHT_LOWER_LEG'
   | 'LEFT_THIGH'
   | 'LEFT_LOWER_LEG'
-  | 'CHEST'
+  | 'RIGHT_HAND'
+  | 'LEFT_HAND'
+  | 'RIGHT_FOOT'
+  | 'LEFT_FOOT'
   | 'BACK'
+  | 'CHEST'
   | 'ABDOMEN'
   | 'ARM'
   | 'HAND'
@@ -42,6 +46,8 @@ export type SkinSign =
 export interface SkinCondition {
   bodyPart: BodyPart;
   symptoms: Symptoms;
+  /** 이 부위에 나타난 증상. 없으면 생략하거나 빈 배열 */
+  skinSigns?: SkinSign[];
 }
 
 export interface Lifestyle {

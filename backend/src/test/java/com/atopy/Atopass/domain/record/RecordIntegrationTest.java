@@ -1,5 +1,7 @@
 package com.atopy.Atopass.domain.record;
 
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -108,6 +110,35 @@ class RecordIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated());
+	}
+
+	@Test
+	void 부위마다_나타난_증상을_저장하고_하루의_나타난_증상에_합친다() throws Exception {
+		String bearer = newMemberBearer();
+		Map<String, Object> neck = new LinkedHashMap<>(condition("NECK", Map.of("pain", 3)));
+		neck.put("skinSigns", List.of("ERYTHEMA"));
+		Map<String, Object> leftHand = new LinkedHashMap<>(condition("LEFT_HAND", Map.of("pain", 5)));
+		leftHand.put("skinSigns", List.of("SCALING"));
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("recordDate", "2026-10-17");
+		body.put("skinConditions", List.of(neck, leftHand, condition("BACK", Map.of("pain", 1))));
+
+		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
+			.andExpect(status().isCreated())
+			.andReturn().getResponse().getContentAsString();
+		long id = jsonMapper.readTree(response).get("data").get("recordId").asLong();
+
+		mockMvc.perform(get("/api/v1/records/" + id).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.skinConditions[?(@.bodyPart=='NECK')].skinSigns[0]").value("ERYTHEMA"))
+			.andExpect(jsonPath("$.data.skinConditions[?(@.bodyPart=='LEFT_HAND')].skinSigns[0]").value("SCALING"))
+			.andExpect(jsonPath("$.data.skinSigns", containsInAnyOrder("ERYTHEMA", "SCALING")));
+
+		// 부위에서 증상을 지우면 하루의 증상에서도 빠진다
+		neck.put("skinSigns", List.of());
+		body.put("skinConditions", List.of(neck, leftHand));
+		mockMvc.perform(withJson(put("/api/v1/records/" + id).header(AUTH, bearer), body))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.skinSigns", contains("SCALING")));
 	}
 
 	@Test

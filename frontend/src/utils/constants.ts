@@ -15,9 +15,13 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
   RIGHT_LOWER_LEG: '오른다리 하박',
   LEFT_THIGH: '왼다리 상박',
   LEFT_LOWER_LEG: '왼다리 하박',
-  // 예전 부위 — 팔·다리를 상박·하박으로 나누기 전 기록을 보여 줄 때만 쓴다
-  CHEST: '가슴',
+  RIGHT_HAND: '오른손',
+  LEFT_HAND: '왼손',
+  RIGHT_FOOT: '오른발',
+  LEFT_FOOT: '왼발',
   BACK: '등',
+  // 예전 부위 — 팔·다리를 나누기 전 기록을 보여 줄 때만 쓴다
+  CHEST: '가슴',
   ABDOMEN: '배',
   ARM: '팔',
   HAND: '손',
@@ -39,6 +43,11 @@ export const BODY_MAP_PARTS: BodyPart[] = [
   'RIGHT_LOWER_LEG',
   'LEFT_THIGH',
   'LEFT_LOWER_LEG',
+  'RIGHT_HAND',
+  'LEFT_HAND',
+  'RIGHT_FOOT',
+  'LEFT_FOOT',
+  'BACK',
 ];
 
 /** 부위별 고통 점수는 증상 하나(pain)로 저장한다 — 증상별 점수를 하나로 합친 값 */
