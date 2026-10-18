@@ -10,6 +10,7 @@ import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
 import type { ChatChoiceRequest, ChoiceField } from '@/types/chatbot';
 import { useRecordDraft } from '@/hooks/useRecordDraft';
+import { atomiMood } from '@/utils/atomiMood';
 import { formatKoreanDate, today } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 import { recordPath } from '@/utils/routes';
@@ -23,6 +24,7 @@ export default function ChatbotPage() {
     pendingFields,
     askingField,
     requiresConfirmation,
+    painIndex,
     status,
     error,
     limitReached,
@@ -94,7 +96,11 @@ export default function ChatbotPage() {
             </button>
           </div>
         ) : (
-          <ChatMessageList messages={messages} typing={status === 'sending'} />
+          <ChatMessageList
+            messages={messages}
+            typing={status === 'sending'}
+            mood={atomiMood(painIndex, requiresConfirmation)}
+          />
         )}
       </div>
 
