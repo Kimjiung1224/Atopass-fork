@@ -84,7 +84,7 @@ class ReportIntegrationTest extends ApiTestSupport {
 		assertThat(new String(pdf, 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
 		try (PDDocument document = PDDocument.load(pdf)) {
 			String text = new PDFTextStripper().getText(document);
-			assertThat(text).contains("진료 참고용 피부 기록").contains("가려움").contains("저녁에 팔이 가려웠음");
+			assertThat(text).contains("진료 참고용 피부 기록").contains("고통").contains("저녁에 팔이 가려웠음");
 		}
 	}
 
@@ -250,7 +250,7 @@ class ReportIntegrationTest extends ApiTestSupport {
 	private void createRecord(String bearer, LocalDate date, int itching, String notes) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
-		condition.put("symptoms", Map.of("itching", itching));
+		condition.put("symptoms", Map.of("pain", itching));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));

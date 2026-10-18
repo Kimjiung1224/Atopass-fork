@@ -12,7 +12,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/** 보고서 테스트용 예시 데이터. 둘째 날 팔 가려움이 4점 → 7점으로 갑자기 심해진다. */
+/** 보고서 테스트용 예시 데이터. 둘째 날 팔 고통 점수가 4점 → 7점으로 갑자기 심해진다. */
 final class ReportSamples {
 
 	/** 1x1 크기의 투명 PNG */
@@ -24,10 +24,10 @@ final class ReportSamples {
 
 	static ReportContent content(boolean includePhotos, String notes, List<ReportPhoto> photos) {
 		Map<BodyPart, Map<Symptom, Integer>> day1 = new EnumMap<>(BodyPart.class);
-		day1.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.ITCHING, 4, Symptom.REDNESS, 3)));
+		day1.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.PAIN, 4)));
 		Map<BodyPart, Map<Symptom, Integer>> day2 = new EnumMap<>(BodyPart.class);
-		day2.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.ITCHING, 7)));
-		day2.put(BodyPart.FACE, new EnumMap<>(Map.of(Symptom.DRYNESS, 2)));
+		day2.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.PAIN, 7)));
+		day2.put(BodyPart.FACE, new EnumMap<>(Map.of(Symptom.PAIN, 2)));
 
 		List<DayEntry> days = List.of(
 			new DayEntry(LocalDate.of(2026, 3, 1), day1, new BigDecimal("6.0"), false, OutdoorActivity.MEDIUM,

@@ -103,7 +103,7 @@ class ReportPhotoIntegrationTest extends ApiTestSupport {
 	private long createRecord(String bearer) throws Exception {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", DATE);
-		body.put("skinConditions", List.of(Map.of("bodyPart", "ARM", "symptoms", Map.of("itching", 4))));
+		body.put("skinConditions", List.of(Map.of("bodyPart", "ARM", "symptoms", Map.of("pain", 4))));
 		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
 		return jsonMapper.readTree(response).get("data").get("recordId").asLong();

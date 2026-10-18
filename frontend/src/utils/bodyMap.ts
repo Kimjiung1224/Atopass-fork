@@ -37,7 +37,7 @@ export function bodyMapScores(skinConditions: SkinCondition[], { withLegacy = fa
 
 const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
 
-/** 증상을 정해진 순서(피부건조증, 홍반, 각질 …)로 중복 없이 정렬한다 */
+/** 증상을 정해진 순서(홍반, 부종/구진, 진물/딱지 …)로 중복 없이 정렬한다 */
 export const sortSkinSigns = (signs: Iterable<SkinSign>): SkinSign[] => {
   const set = new Set(signs);
   return SKIN_SIGN_ORDER.filter((sign) => set.has(sign));
@@ -49,7 +49,7 @@ export const partSkinSigns = (skinConditions: SkinCondition[] | undefined): Skin
 
 /**
  * 그날 나타난 증상 — 부위마다 고른 증상과 부위 없이 고른 증상(예전 기록·챗봇)을 합친다.
- * 예: 목에 홍반, 왼손에 각질 → [홍반, 각질]
+ * 예: 목에 홍반, 왼손에 진물/딱지 → [홍반, 진물/딱지]
  */
 export const allSkinSigns = (record: { skinConditions?: SkinCondition[]; skinSigns?: SkinSign[] | null }): SkinSign[] =>
   sortSkinSigns([...partSkinSigns(record.skinConditions), ...(record.skinSigns ?? [])]);

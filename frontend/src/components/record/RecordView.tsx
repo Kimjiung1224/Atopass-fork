@@ -32,7 +32,7 @@ export default function RecordView({ record, recordId, photos }: Props) {
   const partScores = bodyMapScores(record.skinConditions, { withLegacy: true });
   const selectedScore = selectedPart ? partScores[selectedPart] : undefined;
   const selectedSigns = record.skinConditions.find((c) => c.bodyPart === selectedPart)?.skinSigns ?? [];
-  // 부위마다 고른 증상을 합친 그날의 증상 (예: 목 홍반, 왼손 각질 → 홍반, 각질)
+  // 부위마다 고른 증상을 합친 그날의 증상 (예: 목 홍반, 왼손 진물/딱지 → 홍반, 진물/딱지)
   const skinSigns = allSkinSigns(record);
   const painIndex = record.painIndex ?? null;
   const alcohol = record.lifestyle?.alcohol;

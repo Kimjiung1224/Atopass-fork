@@ -20,7 +20,7 @@ interface Props {
 const PAIN_INDEXES = Array.from({ length: PAIN_INDEX_MAX - PAIN_INDEX_MIN + 1 }, (_, i) => PAIN_INDEX_MIN + i);
 /**
  * 고통 지수(0~10) + 약 복용 여부(예/아니오) + 나타난 증상.
- * 나타난 증상은 부위별 기록에서 고른 증상을 모두 합쳐 보여 준다(예: 목 홍반, 왼손 각질 → 홍반, 각질).
+ * 나타난 증상은 부위별 기록에서 고른 증상을 모두 합쳐 보여 준다(예: 목 홍반, 왼손 진물/딱지 → 홍반, 각질).
  * 부위 없이 남은 증상(예전 기록·챗봇)은 여기서 지울 수 있다.
  */
 export default function DailyConditionEditor({ painIndex, medication, skinSigns, skinConditions, onChange }: Props) {
