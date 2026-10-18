@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { BodyPart, SkinCondition } from '@/types/record';
 import { bodyMapScores, isBodyMapPart } from '@/utils/bodyMap';
-import { BODY_MAP_PARTS, BODY_PART_LABELS, PART_PAIN_SYMPTOM, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
+import { BODY_PART_LABELS, PART_PAIN_SYMPTOM, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
 import { bodyPartScore } from '@/utils/recordScore';
 import BodyMap, { BodyMapLegend } from './BodyMap';
 
@@ -39,28 +39,6 @@ export default function SkinConditionEditor({ value, onChange }: Props) {
         </div>
       </div>
 
-      {/* 목처럼 작은 부위도 고르기 쉽게 이름으로도 고를 수 있다 */}
-      <div className="flex flex-wrap gap-2" role="group" aria-label="부위 고르기">
-        {BODY_MAP_PARTS.map((part) => {
-          const score = scores[part];
-          const active = selected === part;
-          return (
-            <button
-              key={part}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setSelected(part)}
-              className={`rounded-full border px-3 py-1.5 text-sm ${
-                active ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 text-gray-700'
-              }`}
-            >
-              {BODY_PART_LABELS[part]}
-              {score !== undefined && <span className="ml-1 font-semibold">{score}</span>}
-            </button>
-          );
-        })}
-      </div>
-
       {selected ? (
         <div className="rounded-xl bg-gray-50 p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -88,7 +66,7 @@ export default function SkinConditionEditor({ value, onChange }: Props) {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-sm text-gray-400">0은 고통 없음, 10은 매우 심함이에요.</p>
+          <p className="mt-2 text-sm text-gray-400">0은 고통 없음(색 없음), 10은 매우 심함이에요.</p>
         </div>
       ) : (
         <p className="text-center text-sm text-gray-500">마네킹에서 부위를 눌러 고통 점수를 골라 주세요.</p>

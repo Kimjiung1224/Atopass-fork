@@ -6,11 +6,15 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
   FACE: '얼굴',
   NECK: '목',
   TRUNK: '몸',
-  UPPER_ARM: '팔 상박',
-  FOREARM: '팔 하박',
+  RIGHT_UPPER_ARM: '오른팔 상박',
+  RIGHT_FOREARM: '오른팔 하박',
+  LEFT_UPPER_ARM: '왼팔 상박',
+  LEFT_FOREARM: '왼팔 하박',
   GROIN: '사타구니',
-  THIGH: '다리 상박',
-  LOWER_LEG: '다리 하박',
+  RIGHT_THIGH: '오른다리 상박',
+  RIGHT_LOWER_LEG: '오른다리 하박',
+  LEFT_THIGH: '왼다리 상박',
+  LEFT_LOWER_LEG: '왼다리 하박',
   // 예전 부위 — 팔·다리를 상박·하박으로 나누기 전 기록을 보여 줄 때만 쓴다
   CHEST: '가슴',
   BACK: '등',
@@ -22,7 +26,20 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
 };
 
 /** 마네킹에서 고를 수 있는 부위 (새 기록은 이 부위로만 남긴다) */
-export const BODY_MAP_PARTS: BodyPart[] = ['FACE', 'NECK', 'TRUNK', 'UPPER_ARM', 'FOREARM', 'GROIN', 'THIGH', 'LOWER_LEG'];
+export const BODY_MAP_PARTS: BodyPart[] = [
+  'FACE',
+  'NECK',
+  'TRUNK',
+  'RIGHT_UPPER_ARM',
+  'RIGHT_FOREARM',
+  'LEFT_UPPER_ARM',
+  'LEFT_FOREARM',
+  'GROIN',
+  'RIGHT_THIGH',
+  'RIGHT_LOWER_LEG',
+  'LEFT_THIGH',
+  'LEFT_LOWER_LEG',
+];
 
 /** 부위별 고통 점수는 증상 하나(pain)로 저장한다 — 증상별 점수를 하나로 합친 값 */
 export const PART_PAIN_SYMPTOM: SymptomKey = 'pain';

@@ -9,10 +9,10 @@ const LEGACY_PART_MAP: Partial<Record<BodyPart, BodyPart[]>> = {
   CHEST: ['TRUNK'],
   BACK: ['TRUNK'],
   ABDOMEN: ['TRUNK'],
-  ARM: ['UPPER_ARM', 'FOREARM'],
-  HAND: ['FOREARM'],
-  LEG: ['THIGH', 'LOWER_LEG'],
-  FOOT: ['LOWER_LEG'],
+  ARM: ['RIGHT_UPPER_ARM', 'RIGHT_FOREARM', 'LEFT_UPPER_ARM', 'LEFT_FOREARM'],
+  HAND: ['RIGHT_FOREARM', 'LEFT_FOREARM'],
+  LEG: ['RIGHT_THIGH', 'RIGHT_LOWER_LEG', 'LEFT_THIGH', 'LEFT_LOWER_LEG'],
+  FOOT: ['RIGHT_LOWER_LEG', 'LEFT_LOWER_LEG'],
 };
 
 export const isBodyMapPart = (part: BodyPart) => BODY_MAP_PARTS.includes(part);
@@ -36,13 +36,14 @@ export function bodyMapScores(skinConditions: SkinCondition[], { withLegacy = fa
   return scores;
 }
 
-/** 기록 안 한 부위 색 */
+/** 기록 안 한 부위와 0점 부위 색 — 고통이 없으면 색을 칠하지 않는다 */
 export const BODY_MAP_EMPTY_COLOR = '#e5e7eb';
 
-/** 고통 점수 색: 0점은 아주 연한 분홍, 10점은 진한 빨강 — 점수가 높을수록 붉어진다 */
-export function painColor(score: number): string {
-  const t = Math.min(Math.max(score / SCORE_MAX, 0), 1);
-  const saturation = 70 + t * 15;
-  const lightness = 93 - t * 52;
+/** 고통 점수 색: 1점은 아주 연한 분홍, 10점은 진한 빨강 — 점수가 높을수록 붉어진다. 0점·기록 없음은 무색 */
+export function painColor(score: number | undefined): string {
+  if (score === undefined || score <= 0) return BODY_MAP_EMPTY_COLOR;
+  const t = Math.min((score - 1) / (SCORE_MAX - 1), 1);
+  const saturation = 80 + t * 5;
+  const lightness = 88 - t * 47;
   return `hsl(0 ${saturation}% ${lightness}%)`;
 }

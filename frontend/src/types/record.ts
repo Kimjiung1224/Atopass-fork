@@ -1,15 +1,19 @@
 // Swagger(openapi.yaml) components.schemas 기준
 
-/** 마네킹 부위(FACE~LOWER_LEG)와, 팔·다리를 나누기 전의 예전 부위(CHEST~FOOT) */
+/** 마네킹 부위(FACE~LEFT_LOWER_LEG, 팔·다리는 좌우·상박·하박)와 예전 부위(CHEST~FOOT) */
 export type BodyPart =
   | 'FACE'
   | 'NECK'
   | 'TRUNK'
-  | 'UPPER_ARM'
-  | 'FOREARM'
+  | 'RIGHT_UPPER_ARM'
+  | 'RIGHT_FOREARM'
+  | 'LEFT_UPPER_ARM'
+  | 'LEFT_FOREARM'
   | 'GROIN'
-  | 'THIGH'
-  | 'LOWER_LEG'
+  | 'RIGHT_THIGH'
+  | 'RIGHT_LOWER_LEG'
+  | 'LEFT_THIGH'
+  | 'LEFT_LOWER_LEG'
   | 'CHEST'
   | 'BACK'
   | 'ABDOMEN'
