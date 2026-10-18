@@ -23,6 +23,27 @@ interface OpenMeteoResponse {
   };
 }
 
+export interface WeatherHistoryPoint {
+  date: string;
+  /** 하루 평균 섭씨. 관측이 없는 날(너무 최근 등)은 null */
+  temperature: number | null;
+  /** 하루 평균 % */
+  humidity: number | null;
+}
+
+export interface WeatherHistory {
+  locationLabel: string;
+  points: WeatherHistoryPoint[];
+}
+
+interface OpenMeteoArchiveResponse {
+  daily: {
+    time: string[];
+    temperature_2m_mean: (number | null)[];
+    relative_humidity_2m_mean: (number | null)[];
+  };
+}
+
 function getLocation(): Promise<{ latitude: number; longitude: number; label: string }> {
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
@@ -70,4 +91,31 @@ export async function getCurrentWeather(): Promise<CurrentWeather> {
     weatherCode: data.current.weather_code,
     locationLabel: location.label,
   };
+}
+
+/**
+ * 기간별 하루 평균 기온·습도 — Open-Meteo 과거 기상 API(API 키 없음, 백엔드를 거치지 않고 바로 호출).
+ * 오늘 날짜까지도 포함해서 내려준다.
+ */
+export async function getHistoricalWeather(startDate: string, endDate: string): Promise<WeatherHistory> {
+  if (startDate > endDate) return { locationLabel: '', points: [] };
+
+  const location = await getLocation();
+  const { data } = await axios.get<OpenMeteoArchiveResponse>('https://archive-api.open-meteo.com/v1/archive', {
+    params: {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      start_date: startDate,
+      end_date: endDate,
+      daily: 'temperature_2m_mean,relative_humidity_2m_mean',
+      timezone: 'Asia/Seoul',
+    },
+  });
+
+  const points = data.daily.time.map((date, i) => ({
+    date,
+    temperature: data.daily.temperature_2m_mean[i] ?? null,
+    humidity: data.daily.relative_humidity_2m_mean[i] ?? null,
+  }));
+  return { locationLabel: location.label, points };
 }

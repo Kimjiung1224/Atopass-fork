@@ -33,6 +33,16 @@ export const OUTDOOR_ACTIVITY_LABELS: Record<OutdoorActivity, string> = {
 export const SCORE_MIN = 0;
 export const SCORE_MAX = 10;
 
+/** 기온(°C) 그래프 세로축. 국내 기후 기준 -10~40도면 연중 대부분을 보여 줄 수 있다. */
+export const TEMPERATURE_MIN = -10;
+export const TEMPERATURE_MAX = 40;
+export const TEMPERATURE_TICKS = [-10, 0, 10, 20, 30, 40];
+
+/** 습도(%) 그래프 세로축 */
+export const HUMIDITY_MIN = 0;
+export const HUMIDITY_MAX = 100;
+export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
+
 /** 고통 지수 0~10 (0은 없음) */
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;

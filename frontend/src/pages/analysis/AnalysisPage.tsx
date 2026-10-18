@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
+import { getHistoricalWeather } from '@/apis/weather';
 import PeriodInsights from '@/components/analysis/PeriodInsights';
 import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
 import SleepBarChart from '@/components/analysis/SleepBarChart';
@@ -10,14 +11,24 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
 import type { BodyPart } from '@/types/record';
-import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
+import {
+  BODY_PART_LABELS,
+  HUMIDITY_MAX,
+  HUMIDITY_MIN,
+  HUMIDITY_TICKS,
+  SCORE_MAX,
+  SCORE_MIN,
+  TEMPERATURE_MAX,
+  TEMPERATURE_MIN,
+  TEMPERATURE_TICKS,
+} from '@/utils/constants';
 import { today } from '@/utils/date';
 import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { bodyPartScoreOf, representativeScore } from '@/utils/recordScore';
 
 type Period = '30' | '90' | 'ALL';
-type Tab = 'overall' | 'bodyPart' | 'sleep';
+type Tab = 'overall' | 'bodyPart' | 'sleep' | 'weather';
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: '30', label: '30일' },
@@ -29,6 +40,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'overall', label: '전체' },
   { value: 'bodyPart', label: '부위별' },
   { value: 'sleep', label: '수면·생활' },
+  { value: 'weather', label: '날씨' },
 ];
 
 const BODY_PART_OPTIONS = Object.entries(BODY_PART_LABELS).map(([value, label]) => ({ value: value as BodyPart, label }));
@@ -64,6 +76,7 @@ export default function AnalysisPage() {
   const range = useMemo(() => periodToRange(period), [period]);
   const isAll = period === 'ALL';
   const isBodyPartTab = tab === 'bodyPart';
+  const isWeatherTab = tab === 'weather';
 
   // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
@@ -85,6 +98,27 @@ export default function AnalysisPage() {
   }, [isBodyPartTab, tab, bodyPart, records.data, range, isAll]);
 
   const hasValue = series.some((d) => d.value !== null);
+
+  // '전체' 기간은 다른 탭처럼 첫 기록일부터 보여 준다. 기록이 없으면 날씨를 조회하지 않는다.
+  const weatherRange = useMemo(() => {
+    if (!isAll) return range;
+    const firstRecordDate = (records.data ?? []).map((r) => r.recordDate).sort()[0];
+    return firstRecordDate ? { startDate: firstRecordDate, endDate: range.endDate } : null;
+  }, [isAll, range, records.data]);
+
+  const weather = useAsync(
+    () => (isWeatherTab && weatherRange ? getHistoricalWeather(weatherRange.startDate, weatherRange.endDate) : Promise.resolve({ locationLabel: '', points: [] })),
+    [isWeatherTab, weatherRange],
+  );
+  const temperatureSeries: TrendDatum[] = useMemo(
+    () => (weather.data?.points ?? []).map((p) => ({ date: p.date, value: p.temperature, recordId: null })),
+    [weather.data],
+  );
+  const humiditySeries: TrendDatum[] = useMemo(
+    () => (weather.data?.points ?? []).map((p) => ({ date: p.date, value: p.humidity, recordId: null })),
+    [weather.data],
+  );
+  const hasWeather = temperatureSeries.some((d) => d.value !== null) || humiditySeries.some((d) => d.value !== null);
   const selectDay = (datum: TrendDatum) => {
     if (datum.recordId !== null) setSelected({ date: datum.date, recordId: datum.recordId });
   };
@@ -126,8 +160,46 @@ export default function AnalysisPage() {
             </div>
           )}
           {tab === 'overall' && <p className="-mt-1 mb-3 text-sm text-gray-400">그날 기록한 증상 중 가장 높은 점수예요.</p>}
+          {isWeatherTab && (
+            <p className="-mt-1 mb-3 text-sm text-gray-400">
+              하루 평균 기온·습도예요.{weather.data?.locationLabel && ` (${weather.data.locationLabel} 기준)`}
+            </p>
+          )}
 
-          {records.loading ? (
+          {isWeatherTab ? (
+            weather.loading ? (
+              <LoadingMessage />
+            ) : weather.error ? (
+              <ErrorMessage message={getErrorMessage(weather.error)} onRetry={weather.reload} />
+            ) : !weatherRange ? (
+              <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
+            ) : !hasWeather ? (
+              <p className="py-12 text-center text-gray-400">이 기간의 날씨 정보를 가져오지 못했어요.</p>
+            ) : (
+              <div className="flex flex-col gap-6">
+                <div>
+                  <p className="mb-2 text-sm font-medium text-gray-500">온도</p>
+                  <TrendLineChart
+                    data={temperatureSeries}
+                    domain={[TEMPERATURE_MIN, TEMPERATURE_MAX]}
+                    ticks={TEMPERATURE_TICKS}
+                    formatValue={(v) => `평균 기온 ${v}°C`}
+                    ariaLabel="기온 변화 그래프"
+                  />
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-medium text-gray-500">습도</p>
+                  <TrendLineChart
+                    data={humiditySeries}
+                    domain={[HUMIDITY_MIN, HUMIDITY_MAX]}
+                    ticks={HUMIDITY_TICKS}
+                    formatValue={(v) => `평균 습도 ${v}%`}
+                    ariaLabel="습도 변화 그래프"
+                  />
+                </div>
+              </div>
+            )
+          ) : records.loading ? (
             <LoadingMessage />
           ) : records.error ? (
             <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
@@ -146,17 +218,17 @@ export default function AnalysisPage() {
             />
           )}
 
-          {hasValue && !records.loading && !records.error && (
+          {!isWeatherTab && hasValue && !records.loading && !records.error && (
             <p className="mt-3 text-sm text-gray-400">날짜를 누르면 그래프 아래에서 그날 기록을 볼 수 있어요.</p>
           )}
-          {summary.data && !summary.data.availableForComparison && (
+          {!isWeatherTab && summary.data && !summary.data.availableForComparison && (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
               아직 기록이 부족해요 (이 기간 {summary.data.recordCount}일). 7일 이상 기록하면 피부 변화를 비교해 드릴게요.
             </p>
           )}
         </section>
 
-        {summary.data?.availableForComparison && <PeriodInsights key={period} insights={summary.data.insights} />}
+        {!isWeatherTab && summary.data?.availableForComparison && <PeriodInsights key={period} insights={summary.data.insights} />}
       </div>
 
       {selected && (
