@@ -84,13 +84,16 @@ public class ChatSessionService {
 			history, today, queryContext);
 	}
 
-	/** LLM 응답을 받은 뒤 사용자 메시지와 챗봇 응답, 초안을 한 번에 저장한다. */
+	/**
+	 * LLM 응답을 받은 뒤(또는 선택지 답을 반영한 뒤) 사용자 메시지와 챗봇 응답, 초안을 한 번에 저장한다.
+	 * viaChoice가 true이면 선택지로 보낸 답이라 이용 한도에 세지 않는다.
+	 */
 	@Transactional
 	public void saveTurn(String sessionId, String userText, String assistantText, String draftJson,
-		int failCount, boolean confirmationReady) {
+		int failCount, boolean confirmationReady, boolean viaChoice) {
 		ChatSession session = sessionRepository.findById(sessionId)
 			.orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
-		messageRepository.save(ChatMessage.of(session, ChatRole.USER, userText));
+		messageRepository.save(ChatMessage.of(session, ChatRole.USER, userText, viaChoice));
 		messageRepository.save(ChatMessage.of(session, ChatRole.ASSISTANT, assistantText));
 		session.updateTurn(draftJson, failCount, confirmationReady);
 	}
@@ -138,7 +141,7 @@ public class ChatSessionService {
 		return created;
 	}
 
-	/** 회원이 {@code from} 이후 보낸 메시지 수 */
+	/** 회원이 {@code from} 이후 글로 보낸 메시지 수 (선택지 답 제외) */
 	public long countUserMessagesSince(Long memberId, LocalDateTime from) {
 		return messageRepository.countByMemberSince(memberId, ChatRole.USER, from);
 	}

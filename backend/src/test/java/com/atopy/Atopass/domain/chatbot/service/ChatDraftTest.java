@@ -252,6 +252,33 @@ class ChatDraftTest {
 	}
 
 	@Test
+	void 지금_묻는_항목은_남은_항목_중_첫_번째이고_모두_채우면_null이다() {
+		ChatDraft draft = ChatDraft.empty();
+		assertThat(draft.askingField()).isEqualTo("painIndex");
+
+		draft.apply(json("{\"painIndex\": 6, \"medication\": true}"));
+		assertThat(draft.askingField()).isEqualTo("sleepHours");
+
+		draft.apply(json("{\"skipped\": [\"sleepHours\", \"notes\"], \"skinSigns\": []}"));
+		assertThat(draft.askingField()).isNull();
+	}
+
+	@Test
+	void 점수가_빠진_부위가_있거나_되묻는_중이면_고통_지수보다_symptoms를_먼저_묻는다() {
+		ChatDraft draft = ChatDraft.empty();
+		draft.apply(json("{\"conditions\": [{\"bodyPart\": \"ARM\"}]}"));
+		assertThat(draft.askingField()).isEqualTo("symptoms");
+
+		ChatDraft followUp = ChatDraft.empty();
+		followUp.markFollowUp(true);
+		assertThat(followUp.askingField()).isEqualTo("symptoms");
+		// 되묻는 상태도 저장·복원된다.
+		assertThat(ChatDraft.fromJson(mapper, followUp.toJson(mapper)).askingField()).isEqualTo("symptoms");
+		followUp.markFollowUp(false);
+		assertThat(followUp.askingField()).isEqualTo("painIndex");
+	}
+
+	@Test
 	void 비어_있거나_깨진_JSON은_빈_초안으로_시작한다() {
 		assertThat(ChatDraft.fromJson(mapper, null).pendingFields()).contains("painIndex");
 		assertThat(ChatDraft.fromJson(mapper, "  ").pendingFields()).contains("painIndex");

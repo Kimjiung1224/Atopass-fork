@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
-import type { ChatMessage, PendingField } from '@/types/chatbot';
+import type { ChatChoiceRequest, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
+import { SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
 /**
@@ -20,16 +21,42 @@ interface SendResult {
 
 const isApiError = (e: unknown, code: string) => e instanceof ApiError && e.code === code;
 
+const SKIN_SIGN_ORDER = Object.keys(SKIN_SIGN_LABELS);
+
+/** 선택지 답을 대화에 남길 문장 — 서버가 대화 내역에 저장하는 문장과 같다 */
+export function choiceText(choice: ChatChoiceRequest): string {
+  if ('skip' in choice) return choice.field === 'notes' ? '없어요' : '넘어갈게요';
+  switch (choice.field) {
+    case 'painIndex':
+      return `${choice.value}점`;
+    case 'sleepHours':
+      return `${choice.value}시간`;
+    case 'medication':
+      return choice.value ? '예' : '아니오';
+    case 'skinSigns':
+      return choice.value.length === 0
+        ? '없어요'
+        : [...choice.value]
+            .sort((a, b) => SKIN_SIGN_ORDER.indexOf(a) - SKIN_SIGN_ORDER.indexOf(b))
+            .map((sign) => SKIN_SIGN_LABELS[sign])
+            .join(', ');
+  }
+}
+
+const FINISH_TEXT = '기록을 마칠게요';
+
 /**
  * 기록(RECORD) 모드 챗봇 세션.
  * - 들어올 때 이용 동의부터 확인하고, 동의 전에는 세션을 만들지 않는다
  * - 날짜별 sessionId가 있으면 대화 내역과 진행 상태(초안 조회 API)를 복원, 없으면 새 세션 생성
- * - 응답의 pendingFields / requiresConfirmation 상태를 노출
+ * - 응답의 pendingFields / askingField / requiresConfirmation 상태를 노출
+ * - 글(send), 선택지(choose), 기록 마치기(finish) 모두 같은 방식으로 한 턴을 주고받는다
  */
 export function useChatSession(recordDate: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
+  const [askingField, setAskingField] = useState<PendingField | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   const [status, setStatus] = useState<ChatStatus>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +84,7 @@ export function useChatSession(recordDate: string) {
           setSessionId(saved);
           setMessages(messages);
           setPendingFields(state.pendingFields);
+          setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
           setStatus('ready');
           return;
@@ -77,6 +105,7 @@ export function useChatSession(recordDate: string) {
       setSessionId(session.sessionId);
       setMessages([]);
       setPendingFields([]);
+      setAskingField('painIndex');
       setRequiresConfirmation(false);
       setStatus('ready');
     } catch (e) {
@@ -107,21 +136,23 @@ export function useChatSession(recordDate: string) {
     await start();
   }, [start]);
 
-  const send = useCallback(
-    async (text: string): Promise<SendResult> => {
+  /** 사용자 말을 먼저 보여 주고 요청을 보낸다. 실패하면 그 말을 목록에서 뺀다 */
+  const runTurn = useCallback(
+    async (text: string, request: (sessionId: string) => Promise<SendMessageResponse>): Promise<SendResult> => {
       if (!sessionId) return { ok: false };
       const userMessage: ChatMessage = { role: 'USER', content: text, createdAt: new Date().toISOString() };
       setMessages((prev) => [...prev, userMessage]);
       setStatus('sending');
       setError(null);
       try {
-        const res = await chatbotApi.sendMessage(sessionId, text);
+        const res = await request(sessionId);
         // understood: false여도 reply에 같은 질문(필요하면 입력 예시 포함)이 오므로 그대로 표시한다
         setMessages((prev) => [
           ...prev,
           { role: 'ASSISTANT', content: res.reply, createdAt: new Date().toISOString() },
         ]);
         setPendingFields(res.pendingFields);
+        setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
         setStatus('ready');
         setLimitReached(false);
@@ -155,15 +186,45 @@ export function useChatSession(recordDate: string) {
     [sessionId, recordDate],
   );
 
+  const send = useCallback(
+    (text: string) => runTurn(text, (id) => chatbotApi.sendMessage(id, text)),
+    [runTurn],
+  );
+
+  /** 선택지 답 — LLM을 거치지 않으므로 이용 한도와 상관없이 보낼 수 있다 */
+  const choose = useCallback(
+    async (choice: ChatChoiceRequest) => {
+      const result = await runTurn(choiceText(choice), (id) => chatbotApi.sendChoice(id, choice));
+      // 다른 탭에서 답했거나 해서 지금 묻는 항목이 바뀌었을 수 있다 — 서버 상태로 다시 맞춘다
+      if (!result.ok && !result.closed && sessionId) {
+        try {
+          const state = await chatbotApi.getDraft(sessionId);
+          setPendingFields(state.pendingFields);
+          setAskingField(state.askingField);
+          setRequiresConfirmation(state.requiresConfirmation);
+        } catch {
+          // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
+        }
+      }
+      return result;
+    },
+    [runTurn, sessionId],
+  );
+
+  const finish = useCallback(() => runTurn(FINISH_TEXT, (id) => chatbotApi.finish(id)), [runTurn]);
+
   return {
     sessionId,
     messages,
     pendingFields,
+    askingField,
     requiresConfirmation,
     status,
     error,
     limitReached,
     send,
+    choose,
+    finish,
     agree,
     retry: start,
   };
