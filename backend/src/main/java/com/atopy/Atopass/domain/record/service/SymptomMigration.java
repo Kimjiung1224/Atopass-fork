@@ -26,8 +26,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       그 부위에 고통 점수가 없으면 옮긴 점수 중 가장 높은 점수를 고통 점수로 남긴다.</li>
  * </ul>
  *
- * <p>MySQL(그리고 테스트용 H2)에서는 JPA가 enum 칸을 정해진 값만 넣을 수 있는 ENUM 타입으로 만든다. 그대로 두면 새 증상이나 새 부위를
- * 저장할 수 없으므로, 먼저 이 칸들을 일반 문자열(VARCHAR) 칸으로 바꾼다.
+ * <p>예전에는 이 칸들이 MySQL ENUM 타입이었다. ENUM에 예전 값이 남아 있으면 JPA(ddl-auto: update)가 새 값 목록으로
+ * 바꾸지 못하고, 새 증상도 넣을 수 없다. 그래서 먼저 문자열(VARCHAR) 칸으로 바꾼 뒤 값을 옮긴다.
+ * 지금은 엔티티가 이 칸들을 VARCHAR로 매핑하므로, 한 번 바꾸고 나면 다시 ENUM으로 돌아가지 않는다.
  */
 @Slf4j
 @Component
@@ -64,7 +65,7 @@ public class SymptomMigration implements ApplicationRunner {
 		});
 	}
 
-	/** ENUM 칸을 VARCHAR로 바꾼다. 이미 바꿨으면 건너뛴다. (MySQL과 테스트용 H2 모두 ENUM 칸을 만든다) */
+	/** ENUM 칸을 VARCHAR로 바꾼다. 이미 바꿨으면 건너뛴다. */
 	void widenEnumColumns() {
 		for (String[] column : ENUM_COLUMNS) {
 			List<String> types = jdbc.queryForList(

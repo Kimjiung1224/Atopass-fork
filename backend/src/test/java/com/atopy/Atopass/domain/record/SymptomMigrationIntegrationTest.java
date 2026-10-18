@@ -10,6 +10,7 @@ import com.atopy.Atopass.domain.record.service.SymptomMigration;
 import com.atopy.Atopass.support.ApiTestSupport;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -17,7 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * 증상 목록을 바꾸기 전에 저장된 기록이 새 목록으로 옮겨지는지 확인한다.
- * 서버가 뜰 때 증상 칸이 문자열 칸으로 바뀌므로, 예전 값을 그대로 넣어 볼 수 있다.
+ * 테스트용 H2는 문자열 칸에도 허용 값 검사(CHECK)를 붙이므로, 예전 값을 넣기 전에 그 검사를 지운다. (MySQL에는 붙지 않는다)
  */
 class SymptomMigrationIntegrationTest extends ApiTestSupport {
 
@@ -27,6 +28,19 @@ class SymptomMigrationIntegrationTest extends ApiTestSupport {
 	JdbcTemplate jdbc;
 	@Autowired
 	SymptomMigration migration;
+
+	@BeforeEach
+	void allowOldValues() {
+		List<String> checks = jdbc.queryForList(
+			"select table_name || '.' || constraint_name from information_schema.table_constraints"
+				+ " where constraint_type = 'CHECK'"
+				+ " and lower(table_name) in ('record_skin_signs', 'skin_condition_signs', 'symptom_scores')",
+			String.class);
+		for (String check : checks) {
+			String[] parts = check.split("\\.");
+			jdbc.execute("alter table " + parts[0] + " drop constraint " + parts[1]);
+		}
+	}
 
 	@Test
 	void 예전_증상별_점수는_부위의_나타난_증상과_고통_점수로_옮긴다() throws Exception {

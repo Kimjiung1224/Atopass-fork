@@ -27,6 +27,8 @@ import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 기록 하나에 속한 신체 부위별 증상 */
 @Getter
@@ -44,8 +46,10 @@ public class SkinCondition {
 	@JoinColumn(name = "record_id", nullable = false)
 	private SkinRecord record;
 
+	// 값 목록이 바뀌어도 저장되도록 MySQL ENUM 대신 문자열 칸으로 둔다. (SymptomMigration 참고)
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 20)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(nullable = false, length = 30)
 	private BodyPart bodyPart;
 
 	@OneToMany(mappedBy = "skinCondition", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -54,8 +58,10 @@ public class SkinCondition {
 	/** 이 부위에 나타난 증상(홍반, 각질 등). 없으면 비어 있다. */
 	@ElementCollection
 	@CollectionTable(name = "skin_condition_signs", joinColumns = @JoinColumn(name = "skin_condition_id"))
+	// 값 목록이 바뀌어도 저장되도록 MySQL ENUM 대신 문자열 칸으로 둔다. (SymptomMigration 참고)
 	@Enumerated(EnumType.STRING)
-	@Column(name = "skin_sign", nullable = false, length = 20)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(name = "skin_sign", nullable = false, length = 30)
 	private Set<SkinSign> skinSigns = EnumSet.noneOf(SkinSign.class);
 
 	SkinCondition(SkinRecord record, BodyPart bodyPart, Map<Symptom, Integer> scores, Collection<SkinSign> skinSigns) {

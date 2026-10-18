@@ -32,6 +32,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * 하루 한 건의 피부 기록. 기록하지 않은 값(고통 지수, 수면, 약 복용, 음주, 야외활동, 메모)은 null이다.
@@ -79,8 +81,10 @@ public class SkinRecord extends BaseTimeEntity {
 	/** 나타난 증상. 없으면 비어 있다. */
 	@ElementCollection
 	@CollectionTable(name = "record_skin_signs", joinColumns = @JoinColumn(name = "record_id"))
+	// 값 목록이 바뀌어도 저장되도록 MySQL ENUM 대신 문자열 칸으로 둔다. (SymptomMigration 참고)
 	@Enumerated(EnumType.STRING)
-	@Column(name = "skin_sign", nullable = false, length = 20)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(name = "skin_sign", nullable = false, length = 30)
 	private Set<SkinSign> skinSigns = EnumSet.noneOf(SkinSign.class);
 
 	@Builder

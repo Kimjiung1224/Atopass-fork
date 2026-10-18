@@ -15,6 +15,8 @@ import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /** 부위별 증상 하나의 점수(0~10). 기록하지 않은 증상은 행을 만들지 않는다. */
 @Getter
@@ -32,8 +34,10 @@ public class SymptomScore {
 	@JoinColumn(name = "skin_condition_id", nullable = false)
 	private SkinCondition skinCondition;
 
+	// 값 목록이 바뀌어도 저장되도록 MySQL ENUM 대신 문자열 칸으로 둔다. (SymptomMigration 참고)
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 20)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(nullable = false, length = 30)
 	private Symptom symptom;
 
 	@Column(nullable = false)
