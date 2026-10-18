@@ -128,18 +128,21 @@ public class SkinRecord extends BaseTimeEntity {
 	}
 
 	/**
-	 * 부위별 증상을 통째로 교체한다. 같은 부위는 점수만 바꾸고, 빠진 부위는 지우고, 새 부위는 추가한다.
+	 * 부위별 증상을 통째로 교체한다. 같은 부위는 점수·나타난 증상만 바꾸고, 빠진 부위는 지우고, 새 부위는 추가한다.
 	 * (지우고 다시 넣으면 unique 제약에 걸릴 수 있어 제자리에서 갱신한다.)
 	 */
-	public void replaceConditions(Map<BodyPart, Map<Symptom, Integer>> incoming) {
+	public void replaceConditions(Map<BodyPart, Map<Symptom, Integer>> incoming,
+		Map<BodyPart, Set<SkinSign>> incomingSigns) {
 		conditions.removeIf(c -> !incoming.containsKey(c.getBodyPart()));
 		incoming.forEach((bodyPart, scores) -> {
+			Set<SkinSign> signs = incomingSigns.getOrDefault(bodyPart, EnumSet.noneOf(SkinSign.class));
 			Optional<SkinCondition> existing = conditions.stream()
 				.filter(c -> c.getBodyPart() == bodyPart).findFirst();
 			if (existing.isPresent()) {
 				existing.get().replaceScores(scores);
+				existing.get().replaceSkinSigns(signs);
 			} else {
-				conditions.add(new SkinCondition(this, bodyPart, scores));
+				conditions.add(new SkinCondition(this, bodyPart, scores, signs));
 			}
 		});
 	}

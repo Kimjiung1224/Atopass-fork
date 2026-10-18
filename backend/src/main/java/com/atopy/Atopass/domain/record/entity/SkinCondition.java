@@ -1,7 +1,9 @@
 package com.atopy.Atopass.domain.record.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,9 +17,12 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -46,14 +51,32 @@ public class SkinCondition {
 	@OneToMany(mappedBy = "skinCondition", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<SymptomScore> scores = new ArrayList<>();
 
-	SkinCondition(SkinRecord record, BodyPart bodyPart, Map<Symptom, Integer> scores) {
+	/** 이 부위에 나타난 증상(홍반, 각질 등). 없으면 비어 있다. */
+	@ElementCollection
+	@CollectionTable(name = "skin_condition_signs", joinColumns = @JoinColumn(name = "skin_condition_id"))
+	@Enumerated(EnumType.STRING)
+	@Column(name = "skin_sign", nullable = false, length = 20)
+	private Set<SkinSign> skinSigns = EnumSet.noneOf(SkinSign.class);
+
+	SkinCondition(SkinRecord record, BodyPart bodyPart, Map<Symptom, Integer> scores, Collection<SkinSign> skinSigns) {
 		this.record = record;
 		this.bodyPart = bodyPart;
 		replaceScores(scores);
+		replaceSkinSigns(skinSigns);
 	}
 
 	public List<SymptomScore> getScores() {
 		return Collections.unmodifiableList(scores);
+	}
+
+	public Set<SkinSign> getSkinSigns() {
+		return Collections.unmodifiableSet(skinSigns);
+	}
+
+	/** 이 부위에 나타난 증상을 통째로 교체한다. */
+	void replaceSkinSigns(Collection<SkinSign> incoming) {
+		skinSigns.retainAll(incoming);
+		skinSigns.addAll(incoming);
 	}
 
 	/**
