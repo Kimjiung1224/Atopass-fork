@@ -63,9 +63,30 @@ export const OUTDOOR_ACTIVITY_LABELS: Record<OutdoorActivity, string> = {
 export const SCORE_MIN = 0;
 export const SCORE_MAX = 10;
 
+/** 기온(°C) 그래프 세로축. 국내 기후 기준 -10~40도면 연중 대부분을 보여 줄 수 있다. */
+export const TEMPERATURE_MIN = -10;
+export const TEMPERATURE_MAX = 40;
+export const TEMPERATURE_TICKS = [-10, 0, 10, 20, 30, 40];
+
+/** 습도(%) 그래프 세로축 */
+export const HUMIDITY_MIN = 0;
+export const HUMIDITY_MAX = 100;
+export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
+
 /** 고통 지수 0~10 (0은 없음) */
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
+
+/**
+ * 겹쳐보기 그래프의 지표별 고정 색. 순서가 CVD 안전성 근거이므로 항상 같은 순서(슬롯)를 쓴다 —
+ * 어떤 지표를 켜고 끄든 같은 지표는 항상 같은 색을 유지한다(선택 순서로 재배정하지 않음).
+ */
+export const OVERLAY_SERIES_COLORS = {
+  score: '#2a78d6',
+  sleep: '#eb6834',
+  temperature: '#1baf7a',
+  humidity: '#eda100',
+} as const;
 
 /** 챗봇 질문 순서와 같은 번호 순서 (1 피부건조증 … 7 태선화) */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
