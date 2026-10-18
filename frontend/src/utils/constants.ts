@@ -47,6 +47,17 @@ export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
+/**
+ * 겹쳐보기 그래프의 지표별 고정 색. 순서가 CVD 안전성 근거이므로 항상 같은 순서(슬롯)를 쓴다 —
+ * 어떤 지표를 켜고 끄든 같은 지표는 항상 같은 색을 유지한다(선택 순서로 재배정하지 않음).
+ */
+export const OVERLAY_SERIES_COLORS = {
+  score: '#2a78d6',
+  sleep: '#eb6834',
+  temperature: '#1baf7a',
+  humidity: '#eda100',
+} as const;
+
 /** 챗봇 질문 순서와 같은 번호 순서 (1 피부건조증 … 7 태선화) */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   XEROSIS: '피부건조증',

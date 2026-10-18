@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
 import { getHistoricalWeather } from '@/apis/weather';
+import OverlayTrendChart, { type OverlaySeries } from '@/components/analysis/OverlayTrendChart';
 import PeriodInsights from '@/components/analysis/PeriodInsights';
 import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
 import SleepBarChart from '@/components/analysis/SleepBarChart';
@@ -16,6 +17,7 @@ import {
   HUMIDITY_MAX,
   HUMIDITY_MIN,
   HUMIDITY_TICKS,
+  OVERLAY_SERIES_COLORS,
   SCORE_MAX,
   SCORE_MIN,
   TEMPERATURE_MAX,
@@ -28,7 +30,15 @@ import { getErrorMessage } from '@/utils/errorMessage';
 import { bodyPartScoreOf, representativeScore } from '@/utils/recordScore';
 
 type Period = '30' | '90' | 'ALL';
-type Tab = 'overall' | 'bodyPart' | 'sleep' | 'weather';
+type Tab = 'overall' | 'bodyPart' | 'sleep' | 'weather' | 'overlay';
+type OverlayKey = 'score' | 'sleep' | 'temperature' | 'humidity';
+
+const OVERLAY_METRICS: { key: OverlayKey; label: string }[] = [
+  { key: 'score', label: '증상 점수' },
+  { key: 'sleep', label: '수면 시간' },
+  { key: 'temperature', label: '기온' },
+  { key: 'humidity', label: '습도' },
+];
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: '30', label: '30일' },
@@ -41,6 +51,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'bodyPart', label: '부위별' },
   { value: 'sleep', label: '수면·생활' },
   { value: 'weather', label: '날씨' },
+  { value: 'overlay', label: '겹쳐보기' },
 ];
 
 const BODY_PART_OPTIONS = Object.entries(BODY_PART_LABELS).map(([value, label]) => ({ value: value as BodyPart, label }));
@@ -70,6 +81,8 @@ export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overall');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
+  // 겹쳐보기에서 켠 지표. 기본은 전부 켠 상태로 시작한다.
+  const [overlayKeys, setOverlayKeys] = useState<Set<OverlayKey>>(() => new Set(OVERLAY_METRICS.map((m) => m.key)));
   // 그래프에서 누른 날. 화면을 옮기지 않고 그래프 아래에 그날 기록을 보여 준다.
   const [selected, setSelected] = useState<{ date: string; recordId: number } | null>(null);
 
@@ -77,6 +90,7 @@ export default function AnalysisPage() {
   const isAll = period === 'ALL';
   const isBodyPartTab = tab === 'bodyPart';
   const isWeatherTab = tab === 'weather';
+  const isOverlayTab = tab === 'overlay';
 
   // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
@@ -106,9 +120,10 @@ export default function AnalysisPage() {
     return firstRecordDate ? { startDate: firstRecordDate, endDate: range.endDate } : null;
   }, [isAll, range, records.data]);
 
+  const needsWeather = isWeatherTab || isOverlayTab;
   const weather = useAsync(
-    () => (isWeatherTab && weatherRange ? getHistoricalWeather(weatherRange.startDate, weatherRange.endDate) : Promise.resolve({ locationLabel: '', points: [] })),
-    [isWeatherTab, weatherRange],
+    () => (needsWeather && weatherRange ? getHistoricalWeather(weatherRange.startDate, weatherRange.endDate) : Promise.resolve({ locationLabel: '', points: [] })),
+    [needsWeather, weatherRange],
   );
   const temperatureSeries: TrendDatum[] = useMemo(
     () => (weather.data?.points ?? []).map((p) => ({ date: p.date, value: p.temperature, recordId: null })),
@@ -119,6 +134,64 @@ export default function AnalysisPage() {
     [weather.data],
   );
   const hasWeather = temperatureSeries.some((d) => d.value !== null) || humiditySeries.some((d) => d.value !== null);
+
+  // 겹쳐보기용: 탭과 무관하게 증상 점수·수면 시간을 뽑는다(날씨와 같은 날짜 범위를 써서 날짜가 맞물리게 한다).
+  // weatherRange가 null이면(전체 기간인데 기록이 없음) 앵커가 없는 것이므로 계산하지 않는다.
+  const overlayScoreSeries = useMemo(() => {
+    if (!weatherRange) return [];
+    const items = (records.data ?? []).map((r) => ({
+      date: r.recordDate,
+      value: representativeScore(r.skinConditions),
+      recordId: r.recordId,
+    }));
+    return toDailySeries(items, weatherRange.startDate, weatherRange.endDate, false);
+  }, [records.data, weatherRange]);
+  const overlaySleepSeries = useMemo(() => {
+    if (!weatherRange) return [];
+    const items = (records.data ?? []).map((r) => ({ date: r.recordDate, value: r.sleepHours ?? null, recordId: r.recordId }));
+    return toDailySeries(items, weatherRange.startDate, weatherRange.endDate, false);
+  }, [records.data, weatherRange]);
+
+  const overlayAllSeries: Record<OverlayKey, OverlaySeries> = {
+    score: {
+      key: 'score',
+      label: '증상 점수',
+      color: OVERLAY_SERIES_COLORS.score,
+      data: overlayScoreSeries,
+      formatValue: (v) => `${v}점`,
+    },
+    sleep: {
+      key: 'sleep',
+      label: '수면 시간',
+      color: OVERLAY_SERIES_COLORS.sleep,
+      data: overlaySleepSeries,
+      formatValue: (v) => `${v}시간`,
+    },
+    temperature: {
+      key: 'temperature',
+      label: '기온',
+      color: OVERLAY_SERIES_COLORS.temperature,
+      data: temperatureSeries,
+      formatValue: (v) => `${v}°C`,
+    },
+    humidity: {
+      key: 'humidity',
+      label: '습도',
+      color: OVERLAY_SERIES_COLORS.humidity,
+      data: humiditySeries,
+      formatValue: (v) => `${v}%`,
+    },
+  };
+  const overlaySelectedSeries = OVERLAY_METRICS.filter((m) => overlayKeys.has(m.key)).map((m) => overlayAllSeries[m.key]);
+  const toggleOverlayKey = (key: OverlayKey) => {
+    setOverlayKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const selectDay = (datum: TrendDatum) => {
     if (datum.recordId !== null) setSelected({ date: datum.date, recordId: datum.recordId });
   };
@@ -165,8 +238,28 @@ export default function AnalysisPage() {
               하루 평균 기온·습도예요.{weather.data?.locationLabel && ` (${weather.data.locationLabel} 기준)`}
             </p>
           )}
+          {isOverlayTab && (
+            <div className="mb-3 flex flex-col gap-2">
+              <ToggleChipGroup label="지표" options={OVERLAY_METRICS} selected={overlayKeys} onToggle={toggleOverlayKey} colors={OVERLAY_SERIES_COLORS} />
+              <p className="text-sm text-gray-400">단위가 달라 실제 값 대신 기간 내 상대값(0~100%)으로 겹쳐요. 실제 값은 툴팁에서 볼 수 있어요.</p>
+            </div>
+          )}
 
-          {isWeatherTab ? (
+          {isOverlayTab ? (
+            weather.loading || records.loading ? (
+              <LoadingMessage />
+            ) : weather.error ? (
+              <ErrorMessage message={getErrorMessage(weather.error)} onRetry={weather.reload} />
+            ) : records.error ? (
+              <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
+            ) : !weatherRange ? (
+              <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
+            ) : overlaySelectedSeries.length === 0 ? (
+              <p className="py-12 text-center text-gray-400">겹쳐 볼 지표를 선택해 주세요.</p>
+            ) : (
+              <OverlayTrendChart series={overlaySelectedSeries} ariaLabel="선택한 지표를 겹친 변화 그래프" />
+            )
+          ) : isWeatherTab ? (
             weather.loading ? (
               <LoadingMessage />
             ) : weather.error ? (
@@ -218,17 +311,19 @@ export default function AnalysisPage() {
             />
           )}
 
-          {!isWeatherTab && hasValue && !records.loading && !records.error && (
+          {!isWeatherTab && !isOverlayTab && hasValue && !records.loading && !records.error && (
             <p className="mt-3 text-sm text-gray-400">날짜를 누르면 그래프 아래에서 그날 기록을 볼 수 있어요.</p>
           )}
-          {!isWeatherTab && summary.data && !summary.data.availableForComparison && (
+          {!isWeatherTab && !isOverlayTab && summary.data && !summary.data.availableForComparison && (
             <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
               아직 기록이 부족해요 (이 기간 {summary.data.recordCount}일). 7일 이상 기록하면 피부 변화를 비교해 드릴게요.
             </p>
           )}
         </section>
 
-        {!isWeatherTab && summary.data?.availableForComparison && <PeriodInsights key={period} insights={summary.data.insights} />}
+        {!isWeatherTab && !isOverlayTab && summary.data?.availableForComparison && (
+          <PeriodInsights key={period} insights={summary.data.insights} />
+        )}
       </div>
 
       {selected && (
@@ -270,6 +365,49 @@ function SegmentedControl<T extends string>({
           {option.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+function ToggleChipGroup<T extends string>({
+  label,
+  options,
+  selected,
+  onToggle,
+  colors,
+}: {
+  label: string;
+  options: { key: T; label: string }[];
+  selected: Set<T>;
+  onToggle: (key: T) => void;
+  colors: Record<T, string>;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-9 shrink-0 text-sm font-medium text-gray-500">{label}</span>
+      <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const isOn = selected.has(option.key);
+          return (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={isOn}
+              onClick={() => onToggle(option.key)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${
+                isOn ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: colors[option.key], opacity: isOn ? 1 : 0.4 }}
+              />
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
