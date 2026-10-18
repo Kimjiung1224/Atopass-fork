@@ -10,7 +10,7 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
 import type { BodyPart } from '@/types/record';
-import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
+import { BODY_MAP_PARTS, BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
 import { today } from '@/utils/date';
 import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -31,7 +31,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'sleep', label: '수면·생활' },
 ];
 
-const BODY_PART_OPTIONS = Object.entries(BODY_PART_LABELS).map(([value, label]) => ({ value: value as BodyPart, label }));
+const BODY_PART_OPTIONS = BODY_MAP_PARTS.map((value) => ({ value, label: BODY_PART_LABELS[value] }));
 
 /** '전체' 기간 조회 시작일. 그래프는 첫 기록일부터 그린다. */
 const ALL_START_DATE = '2000-01-01';

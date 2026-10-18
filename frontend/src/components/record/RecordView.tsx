@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import type { PhotoRef, RecordInput, SkinCondition, SymptomKey } from '@/types/record';
-import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SCORE_MAX, SYMPTOM_LABELS } from '@/utils/constants';
+import { bodyMapScores } from '@/utils/bodyMap';
+import {
+  BODY_PART_LABELS,
+  EMPTY_TEXT,
+  OUTDOOR_ACTIVITY_LABELS,
+  PART_PAIN_SYMPTOM,
+  SCORE_MAX,
+  SYMPTOM_LABELS,
+} from '@/utils/constants';
 import { bodyPartScore, representativeScore } from '@/utils/recordScore';
+import BodyMap, { BodyMapLegend } from './BodyMap';
 import SavedPhotoList from './SavedPhotoList';
 import Section from './Section';
 
@@ -37,17 +46,24 @@ export default function RecordView({ record, recordId, photos }: Props) {
         </div>
       </div>
 
-      <Section title="부위별 증상 점수">
+      <Section title="부위별 고통 점수">
         {record.skinConditions.length === 0 ? (
           <p className="text-gray-400">{EMPTY_TEXT}</p>
         ) : (
           <>
+            <div className="mb-4 rounded-xl border border-gray-200 p-4">
+              {/* 예전 부위(팔·다리)로 남긴 기록도 해당하는 마네킹 부위에 칠한다 */}
+              <BodyMap scores={bodyMapScores(record.skinConditions, { withLegacy: true })} />
+              <div className="mt-3">
+                <BodyMapLegend />
+              </div>
+            </div>
             <ul className="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-200 px-4">
-              {record.skinConditions.map((condition) => (
+              {sortByBodyPart(record.skinConditions).map((condition) => (
                 <BodyPartRow key={condition.bodyPart} condition={condition} />
               ))}
             </ul>
-            <p className="mt-2 text-sm text-gray-400">부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.</p>
+            <p className="mt-2 text-sm text-gray-400">점수가 높을수록 붉게 칠해져요.</p>
           </>
         )}
       </Section>
@@ -79,6 +95,13 @@ export default function RecordView({ record, recordId, photos }: Props) {
   );
 }
 
+const BODY_PART_ORDER = Object.keys(BODY_PART_LABELS);
+
+/** 마네킹 부위 순서(얼굴 → 다리 하박)로 정렬 */
+function sortByBodyPart(conditions: SkinCondition[]) {
+  return [...conditions].sort((a, b) => BODY_PART_ORDER.indexOf(a.bodyPart) - BODY_PART_ORDER.indexOf(b.bodyPart));
+}
+
 /** 점수 막대 */
 function ScoreBar({ score }: { score: number }) {
   return (
@@ -91,7 +114,10 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
-/** 부위 하나: 증상 평균을 한 줄로 보여 주고, 누르면 기록한 증상별 점수(높은 순)를 펼친다 */
+/**
+ * 부위 하나: 고통 점수를 한 줄로 보여 준다.
+ * 증상별로 점수를 남긴 예전 기록은 평균을 보여 주고, 누르면 증상별 점수(높은 순)를 펼친다.
+ */
 function BodyPartRow({ condition }: { condition: SkinCondition }) {
   const [open, setOpen] = useState(false);
   const score = bodyPartScore(condition);
@@ -99,11 +125,23 @@ function BodyPartRow({ condition }: { condition: SkinCondition }) {
     .filter((entry): entry is [SymptomKey, number] => typeof entry[1] === 'number')
     .sort((a, b) => b[1] - a[1]);
 
+  const onlyPain = symptoms.length === 1 && symptoms[0][0] === PART_PAIN_SYMPTOM;
+
   if (score === null) {
     return (
       <li className="grid grid-cols-[4.5rem_1fr] items-center gap-3 py-3">
         <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
         <span className="text-gray-400">기록한 증상 없음</span>
+      </li>
+    );
+  }
+
+  if (onlyPain) {
+    return (
+      <li className="grid grid-cols-[4.5rem_1fr_3rem_1rem] items-center gap-3 py-3">
+        <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
+        <ScoreBar score={score} />
+        <span className="text-right font-semibold">{score}점</span>
       </li>
     );
   }

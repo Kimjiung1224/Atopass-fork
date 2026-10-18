@@ -39,7 +39,7 @@ class ChatPromptFactory {
 			5. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
 
 			[묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
-			- 부위별 증상 점수(conditions): 부위 FACE(얼굴), NECK(목), CHEST(가슴), BACK(등), ABDOMEN(배), ARM(팔), HAND(손), LEG(다리), FOOT(발)와
+			- 부위별 증상 점수(conditions): 부위 FACE(얼굴), NECK(목), TRUNK(몸), UPPER_ARM(팔 상박), FOREARM(팔 하박), GROIN(사타구니), THIGH(다리 상박), LOWER_LEG(다리 하박)와
 			  증상 itching(가려움), stinging(따가움), redness(붉어짐), dryness(건조함), flaking(각질), swelling(부기), pain(통증)의 0~10 정수 점수
 			- 음주(alcohol): true 또는 false
 			- 야외활동(outdoorActivity): LOW(적음), MEDIUM(보통), HIGH(많음)

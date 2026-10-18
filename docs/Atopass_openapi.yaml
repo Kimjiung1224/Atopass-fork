@@ -1023,7 +1023,8 @@ components:
     # ── Enum ──
     BodyPart:
       type: string
-      enum: [FACE, NECK, CHEST, BACK, ABDOMEN, ARM, HAND, LEG, FOOT]
+      description: 마네킹 부위(FACE~LOWER_LEG). CHEST~FOOT는 예전 기록을 읽기 위해 남겨 둔 부위
+      enum: [FACE, NECK, TRUNK, UPPER_ARM, FOREARM, GROIN, THIGH, LOWER_LEG, CHEST, BACK, ABDOMEN, ARM, HAND, LEG, FOOT]
     Symptom:
       type: string
       enum: [itching, stinging, redness, dryness, flaking, swelling, pain]
