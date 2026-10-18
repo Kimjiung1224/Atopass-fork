@@ -14,7 +14,7 @@ public record RecordDetailResponse(
 	List<SkinConditionResponse> skinConditions,
 	Integer painIndex,
 	BigDecimal sleepHours,
-	/** 수면 점수 1~5 (7~9시간이 5점, 2시간 벗어날 때마다 1점 감점) */
+	/** 수면 점수 1~5 (7~8시간이 5점, 2시간 벗어날 때마다 1점 감점) */
 	Integer sleepScore,
 	Boolean medication,
 	List<SkinSign> skinSigns,

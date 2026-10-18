@@ -8,12 +8,11 @@ import ComparisonView from '@/components/record/ComparisonView';
 import { useAsync } from '@/hooks/useAsync';
 import { toDateString, today } from '@/utils/date';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { representativeScore } from '@/utils/recordScore';
 import { recordPath } from '@/utils/routes';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-/** 대표 점수(가장 높은 증상 점수) 구간별 표시 색 */
+/** 고통 지수 구간별 표시 색 */
 const SCORE_LEVELS = [
   { max: 3, label: '0~3점', className: 'bg-emerald-500' },
   { max: 6, label: '4~6점', className: 'bg-amber-400' },
@@ -147,7 +146,7 @@ export default function CalendarPage() {
               {cells.map((date, i) => {
                 if (!date) return <li key={`blank-${i}`} />;
                 const record = recordByDate.get(date);
-                const score = representativeScore(record?.skinConditions);
+                const score = record?.painIndex ?? null;
                 const isFuture = date > todayString;
                 const isToday = date === todayString;
                 const day = Number(date.slice(-2));
@@ -207,7 +206,7 @@ export default function CalendarPage() {
               점수 없음
             </li>
           </ul>
-          <p className="mt-2 text-gray-400">점은 그날 기록한 증상 중 가장 높은 점수예요. {comparing ? '비교 모드에서는 기록이 없는 날도 고를 수 있어요.' : '날짜를 누르면 그날 기록을 볼 수 있어요.'}</p>
+          <p className="mt-2 text-gray-400">점은 그날 기록한 고통 지수예요. {comparing ? '비교 모드에서는 기록이 없는 날도 고를 수 있어요.' : '날짜를 누르면 그날 기록을 볼 수 있어요.'}</p>
         </section>
       </div>
     </>

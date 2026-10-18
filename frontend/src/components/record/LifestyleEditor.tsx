@@ -38,7 +38,7 @@ export default function LifestyleEditor({ sleepHours, lifestyle, onChange }: Pro
       </label>
       {score != null && (
         <p className="-mt-2 text-right text-sm text-gray-500">
-          수면 점수 {score}/{SLEEP_SCORE_MAX}점 <span className="text-gray-400">(7~9시간 5점, 2시간마다 1점 감점)</span>
+          수면 점수 {score}/{SLEEP_SCORE_MAX}점 <span className="text-gray-400">(7~8시간 5점, 2시간마다 1점 감점)</span>
         </p>
       )}
 

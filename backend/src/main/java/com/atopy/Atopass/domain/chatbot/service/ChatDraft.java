@@ -31,6 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>챗봇이 묻는 항목: 고통 지수(필수), 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
  * 부위별 증상 점수와 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
+ * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  */
 public final class ChatDraft {
 
@@ -65,6 +66,8 @@ public final class ChatDraft {
 	private OutdoorActivity outdoorActivity;
 	private String notes;
 	private final Set<String> skipped = new LinkedHashSet<>();
+	/** 챗봇이 부위나 증상 점수를 되물은 상태. 사용자가 글로 답해야 하므로 선택지 대신 입력창을 연다. */
+	private boolean followUp;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
@@ -103,6 +106,9 @@ public final class ChatDraft {
 		}
 		ArrayNode skippedNode = root.putArray("skipped");
 		skipped.forEach(skippedNode::add);
+		if (followUp) {
+			root.put("followUp", true);
+		}
 		return mapper.writeValueAsString(root);
 	}
 
@@ -157,6 +163,7 @@ public final class ChatDraft {
 					draft.skipped.add(item.asString());
 				}
 			}
+			draft.followUp = root.path("followUp").asBoolean(false);
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -299,6 +306,16 @@ public final class ChatDraft {
 		return ApplyResult.OK;
 	}
 
+	/** "넘어갈게요"로 건너뛸 수 있는 항목인지 */
+	static boolean skippable(String field) {
+		return SKIPPABLE.contains(field);
+	}
+
+	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */
+	void markFollowUp(boolean followUp) {
+		this.followUp = followUp;
+	}
+
 	private static boolean present(JsonNode node) {
 		return !node.isMissingNode() && !node.isNull();
 	}
@@ -382,6 +399,18 @@ public final class ChatDraft {
 		return pending;
 	}
 
+	/**
+	 * 지금 물어볼 항목. 아직 입력되지 않은 항목 중 가장 먼저 필요한 것이고, 모두 채워졌으면 null이다.
+	 * 챗봇이 부위나 증상 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 고통 지수보다 먼저 symptoms다.
+	 */
+	public String askingField() {
+		if (followUp || conditions.values().stream().anyMatch(Map::isEmpty)) {
+			return "symptoms";
+		}
+		List<String> pending = pendingFields();
+		return pending.isEmpty() ? null : pending.get(0);
+	}
+
 	/** 확인 단계로 넘어갈 수 있는지. 필수 항목이 채워졌고, 선택 항목도 끝났거나 사용자가 마치겠다고 한 경우 */
 	public boolean readyForConfirmation(boolean userFinished) {
 		return requiredSatisfied() && (userFinished || pendingOptionalFields().isEmpty());
@@ -429,6 +458,7 @@ public final class ChatDraft {
 		copy.outdoorActivity = outdoorActivity;
 		copy.notes = notes;
 		copy.skipped.addAll(skipped);
+		copy.followUp = followUp;
 		return copy;
 	}
 
@@ -444,6 +474,7 @@ public final class ChatDraft {
 		notes = next.notes;
 		skipped.clear();
 		skipped.addAll(next.skipped);
+		followUp = next.followUp;
 	}
 
 }

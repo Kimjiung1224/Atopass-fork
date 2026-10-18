@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { PhotoRef, RecordInput, SkinCondition, SymptomKey } from '@/types/record';
-import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, SCORE_MAX, SYMPTOM_LABELS } from '@/utils/constants';
-import { bodyPartScore, representativeScore } from '@/utils/recordScore';
+import type { BodyPart, PhotoRef, RecordInput } from '@/types/record';
+import { bodyMapScores } from '@/utils/bodyMap';
+import { BODY_PART_LABELS, EMPTY_TEXT, OUTDOOR_ACTIVITY_LABELS, PAIN_INDEX_MAX } from '@/utils/constants';
+import BodyMap, { BodyMapLegend } from './BodyMap';
 import SavedPhotoList from './SavedPhotoList';
 import Section from './Section';
 
@@ -11,16 +12,20 @@ interface Props {
   photos: PhotoRef[];
 }
 
-/** 점수 구간별 색 (0~3 / 4~6 / 7~10) */
-function scoreTone(score: number) {
-  if (score <= 3) return { bar: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' };
-  if (score <= 6) return { bar: 'bg-amber-400', badge: 'bg-amber-50 text-amber-700' };
-  return { bar: 'bg-red-500', badge: 'bg-red-50 text-red-700' };
+/** 고통 지수 구간별 색 (0~3 / 4~6 / 7~10) */
+function painTone(score: number) {
+  if (score <= 3) return 'bg-emerald-50 text-emerald-700';
+  if (score <= 6) return 'bg-amber-50 text-amber-700';
+  return 'bg-red-50 text-red-700';
 }
 
 /** 저장된 하루 기록 보기 (읽기 전용) */
 export default function RecordView({ record, recordId, photos }: Props) {
-  const topScore = representativeScore(record.skinConditions);
+  const [selectedPart, setSelectedPart] = useState<BodyPart | null>(null);
+  // 예전 부위(팔·다리)로 남긴 기록도 해당하는 마네킹 부위에 칠한다
+  const partScores = bodyMapScores(record.skinConditions, { withLegacy: true });
+  const selectedScore = selectedPart ? partScores[selectedPart] : undefined;
+  const painIndex = record.painIndex ?? null;
   const alcohol = record.lifestyle?.alcohol;
   const outdoor = record.lifestyle?.outdoorActivity;
 
@@ -28,28 +33,36 @@ export default function RecordView({ record, recordId, photos }: Props) {
     <>
       <div className="px-4 pt-4">
         <div className="flex items-center justify-between rounded-2xl bg-gray-50 p-4">
-          <p className="text-gray-600">가장 높은 증상 점수</p>
-          {topScore === null ? (
+          <p className="text-gray-600">고통 지수</p>
+          {painIndex === null ? (
             <p className="text-gray-400">{EMPTY_TEXT}</p>
           ) : (
-            <p className={`rounded-full px-3 py-1 text-lg font-bold ${scoreTone(topScore).badge}`}>{topScore}점</p>
+            <p className={`rounded-full px-3 py-1 text-lg font-bold ${painTone(painIndex)}`}>
+              {painIndex}점 <span className="text-sm font-normal">/ {PAIN_INDEX_MAX}</span>
+            </p>
           )}
         </div>
       </div>
 
-      <Section title="부위별 증상 점수">
-        {record.skinConditions.length === 0 ? (
-          <p className="text-gray-400">{EMPTY_TEXT}</p>
-        ) : (
-          <>
-            <ul className="flex flex-col divide-y divide-gray-100 rounded-xl border border-gray-200 px-4">
-              {record.skinConditions.map((condition) => (
-                <BodyPartRow key={condition.bodyPart} condition={condition} />
-              ))}
-            </ul>
-            <p className="mt-2 text-sm text-gray-400">부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.</p>
-          </>
-        )}
+      <Section title="부위별 고통 점수">
+        <div className="rounded-xl border border-gray-200 p-4">
+          <BodyMap scores={partScores} selected={selectedPart} onSelect={setSelectedPart} />
+          <div className="mt-3">
+            <BodyMapLegend />
+          </div>
+          <p role="status" className="mt-3 rounded-lg bg-gray-50 py-2.5 text-center text-base">
+            {selectedPart ? (
+              <>
+                <span className="font-semibold text-gray-800">{BODY_PART_LABELS[selectedPart]}</span>{' '}
+                <span className={selectedScore === undefined ? 'text-gray-400' : 'font-bold text-gray-900'}>
+                  {selectedScore === undefined ? EMPTY_TEXT : `${selectedScore}점`}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm text-gray-500">부위를 누르면 고통 점수를 볼 수 있어요.</span>
+            )}
+          </p>
+        </div>
       </Section>
 
       <Section title="수면·생활">
@@ -76,65 +89,6 @@ export default function RecordView({ record, recordId, photos }: Props) {
         )}
       </Section>
     </>
-  );
-}
-
-/** 점수 막대 */
-function ScoreBar({ score }: { score: number }) {
-  return (
-    <span className="h-2.5 overflow-hidden rounded-full bg-gray-100">
-      <span
-        className={`block h-full rounded-full ${scoreTone(score).bar}`}
-        style={{ width: `${(score / SCORE_MAX) * 100}%` }}
-      />
-    </span>
-  );
-}
-
-/** 부위 하나: 증상 평균을 한 줄로 보여 주고, 누르면 기록한 증상별 점수(높은 순)를 펼친다 */
-function BodyPartRow({ condition }: { condition: SkinCondition }) {
-  const [open, setOpen] = useState(false);
-  const score = bodyPartScore(condition);
-  const symptoms = (Object.entries(condition.symptoms) as [SymptomKey, number | undefined][])
-    .filter((entry): entry is [SymptomKey, number] => typeof entry[1] === 'number')
-    .sort((a, b) => b[1] - a[1]);
-
-  if (score === null) {
-    return (
-      <li className="grid grid-cols-[4.5rem_1fr] items-center gap-3 py-3">
-        <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
-        <span className="text-gray-400">기록한 증상 없음</span>
-      </li>
-    );
-  }
-
-  return (
-    <li className="py-3">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="grid w-full grid-cols-[4.5rem_1fr_3rem_1rem] items-center gap-3 text-left"
-      >
-        <span className="font-bold text-gray-800">{BODY_PART_LABELS[condition.bodyPart]}</span>
-        <ScoreBar score={score} />
-        <span className="text-right font-semibold">{score}점</span>
-        <span aria-hidden className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}>
-          ▾
-        </span>
-      </button>
-      {open && (
-        <ul className="mt-3 flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm">
-          {symptoms.map(([key, value]) => (
-            <li key={key} className="grid grid-cols-[4rem_1fr_2.5rem] items-center gap-3">
-              <span className="text-gray-600">{SYMPTOM_LABELS[key]}</span>
-              <ScoreBar score={value} />
-              <span className="text-right text-gray-700">{value}점</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
   );
 }
 

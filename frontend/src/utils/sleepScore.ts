@@ -1,12 +1,12 @@
 import { SLEEP_SCORE_MAX } from './constants';
 
 const OPTIMAL_MIN = 7;
-const OPTIMAL_MAX = 9;
+const OPTIMAL_MAX = 8;
 const STEP_HOURS = 2;
 
 /**
  * 수면 점수(1~5) — 서버(SleepScore)와 같은 규칙.
- * 7~9시간이 5점, 그 범위에서 2시간 벗어날 때마다 1점씩 깎는다(0.1시간만 벗어나도 1점 감점).
+ * 7~8시간이 5점, 그 범위에서 2시간 벗어날 때마다 1점씩 깎는다(0.1시간만 벗어나도 1점 감점).
  */
 export function sleepScore(hours: number | null | undefined): number | null {
   if (hours == null || Number.isNaN(hours)) return null;
