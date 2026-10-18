@@ -69,7 +69,7 @@ export default function ComparisonView({ dateA, dateB, comparison }: Props) {
             <CompareRow label="나타난 증상" valueA={skinSignsText(a)} valueB={skinSignsText(b)} />
           </CompareSection>
 
-          <CompareSection title="부위별 증상 점수" hint="부위마다 기록한 증상 점수의 평균이에요. 누르면 증상별 점수를 볼 수 있어요.">
+          <CompareSection title="부위별 고통 점수" hint="부위마다 기록한 고통 점수예요.">
             {rows.length === 0 ? (
               <p className="py-2 text-center text-gray-400">{EMPTY_TEXT}</p>
             ) : (

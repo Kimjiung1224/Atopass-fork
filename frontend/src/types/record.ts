@@ -1,6 +1,26 @@
 // Swagger(openapi.yaml) components.schemas 기준
 
-export type BodyPart = 'FACE' | 'NECK' | 'CHEST' | 'BACK' | 'ABDOMEN' | 'ARM' | 'HAND' | 'LEG' | 'FOOT';
+/** 마네킹 부위(FACE~LEFT_LOWER_LEG, 팔·다리는 좌우·상박·하박)와 예전 부위(CHEST~FOOT) */
+export type BodyPart =
+  | 'FACE'
+  | 'NECK'
+  | 'TRUNK'
+  | 'RIGHT_UPPER_ARM'
+  | 'RIGHT_FOREARM'
+  | 'LEFT_UPPER_ARM'
+  | 'LEFT_FOREARM'
+  | 'GROIN'
+  | 'RIGHT_THIGH'
+  | 'RIGHT_LOWER_LEG'
+  | 'LEFT_THIGH'
+  | 'LEFT_LOWER_LEG'
+  | 'CHEST'
+  | 'BACK'
+  | 'ABDOMEN'
+  | 'ARM'
+  | 'HAND'
+  | 'LEG'
+  | 'FOOT';
 
 export type SymptomKey = 'itching' | 'stinging' | 'redness' | 'dryness' | 'flaking' | 'swelling' | 'pain';
 

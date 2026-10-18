@@ -254,7 +254,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(withJson(put("/api/v1/records/" + id).header(AUTH, bearer), body))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.skinConditions.length()").value(2))
-			// 부위는 FACE, NECK, CHEST, BACK, ABDOMEN, ARM, HAND, LEG, FOOT 순으로 내려간다.
+			// 부위는 BodyPart 선언 순서(마네킹 부위, 예전 부위 CHEST~FOOT)로 내려간다.
 			.andExpect(jsonPath("$.data.skinConditions[0].bodyPart").value("ARM"))
 			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").value(1))
 			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").value(7))

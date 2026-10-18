@@ -10,11 +10,11 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import { useAsync } from '@/hooks/useAsync';
 import type { BodyPart } from '@/types/record';
-import { BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
+import { BODY_MAP_PARTS, BODY_PART_LABELS, SCORE_MAX, SCORE_MIN } from '@/utils/constants';
 import { today } from '@/utils/date';
 import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { bodyPartScoreOf, representativeScore } from '@/utils/recordScore';
+import { bodyPartScoreOf } from '@/utils/recordScore';
 
 type Period = '30' | '90' | 'ALL';
 type Tab = 'overall' | 'bodyPart' | 'sleep';
@@ -26,12 +26,12 @@ const PERIODS: { value: Period; label: string }[] = [
 ];
 
 const TABS: { value: Tab; label: string }[] = [
-  { value: 'overall', label: '전체' },
+  { value: 'overall', label: '고통 지수' },
   { value: 'bodyPart', label: '부위별' },
   { value: 'sleep', label: '수면·생활' },
 ];
 
-const BODY_PART_OPTIONS = Object.entries(BODY_PART_LABELS).map(([value, label]) => ({ value: value as BodyPart, label }));
+const BODY_PART_OPTIONS = BODY_MAP_PARTS.map((value) => ({ value, label: BODY_PART_LABELS[value] }));
 
 /** '전체' 기간 조회 시작일. 그래프는 첫 기록일부터 그린다. */
 const ALL_START_DATE = '2000-01-01';
@@ -78,7 +78,7 @@ export default function AnalysisPage() {
           ? (r.sleepHours ?? null)
           : isBodyPartTab
             ? bodyPartScoreOf(r.skinConditions, bodyPart)
-            : representativeScore(r.skinConditions),
+            : (r.painIndex ?? null),
       recordId: r.recordId,
     }));
     return toDailySeries(items, range.startDate, range.endDate, isAll);
@@ -122,10 +122,10 @@ export default function AnalysisPage() {
           {isBodyPartTab && (
             <div className="mb-3 flex flex-col gap-2">
               <ChipGroup label="부위" options={BODY_PART_OPTIONS} value={bodyPart} onChange={setBodyPart} />
-              <p className="text-sm text-gray-400">그 부위에 기록한 증상 점수의 평균이에요.</p>
+              <p className="text-sm text-gray-400">그 부위에 기록한 고통 점수예요.</p>
             </div>
           )}
-          {tab === 'overall' && <p className="-mt-1 mb-3 text-sm text-gray-400">그날 기록한 증상 중 가장 높은 점수예요.</p>}
+          {tab === 'overall' && <p className="-mt-1 mb-3 text-sm text-gray-400">그날 기록한 고통 지수예요.</p>}
 
           {records.loading ? (
             <LoadingMessage />
@@ -140,9 +140,9 @@ export default function AnalysisPage() {
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
               ticks={SCORE_TICKS}
-              formatValue={(v) => (tab === 'overall' ? `가장 높은 증상 점수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 증상 점수 ${v}점`)}
+              formatValue={(v) => (tab === 'overall' ? `고통 지수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 고통 점수 ${v}점`)}
               onPointClick={selectDay}
-              ariaLabel={tab === 'overall' ? '전체 증상 점수 변화 그래프' : '부위별 증상 점수 변화 그래프'}
+              ariaLabel={tab === 'overall' ? '고통 지수 변화 그래프' : '부위별 고통 점수 변화 그래프'}
             />
           )}
 
