@@ -21,8 +21,8 @@ interface Props {
   onBarClick?: (datum: TrendDatum) => void;
 }
 
-/** 권장 수면 시간 (성인 7~9시간) */
-export const SLEEP_RECOMMENDED = { min: 7, max: 9 } as const;
+/** 권장 수면 시간 (7~8시간) */
+export const SLEEP_RECOMMENDED = { min: 7, max: 8 } as const;
 
 /** 권장 범위를 벗어난 날의 점 색 */
 const OUT_OF_RANGE = '#d97706';
@@ -53,7 +53,7 @@ function SleepDot({ cx, cy, index, payload }: DotProps) {
 
 /**
  * 날짜별 수면 시간 변화. 증상 그래프와 같이 선으로 잇고, 기록이 끊긴 구간만 점선으로 보인다.
- * 권장 수면 시간(7~9시간)은 초록 띠로 깔고, 범위를 벗어난 날은 점 색을 달리해 한눈에 보이게 한다.
+ * 권장 수면 시간(7~8시간)은 초록 띠로 깔고, 범위를 벗어난 날은 점 색을 달리해 한눈에 보이게 한다.
  */
 export default function SleepBarChart({ data, onBarClick }: Props) {
   const tooltip = ({ active, payload }: TooltipContentProps<ValueType, NameType>) => {

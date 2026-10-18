@@ -48,7 +48,7 @@ export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   LICHENIFICATION: '태선화',
 };
 
-/** 수면 점수: 7~9시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */
+/** 수면 점수: 7~8시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */
 export const SLEEP_SCORE_MAX = 5;
 
 // 사진 제한 (API 명세서: 피부 사진 업로드)
