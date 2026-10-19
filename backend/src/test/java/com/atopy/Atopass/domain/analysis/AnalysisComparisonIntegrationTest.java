@@ -23,28 +23,28 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 	@Test
 	void 양쪽_다_기록이_있으면_A와_B키로_기록_전체를_내려준다() throws Exception {
 		String bearer = newMemberBearer();
-		long recordIdA = createRecord(bearer, DATE_A, Map.of("itching", 2));
-		long recordIdB = createRecord(bearer, DATE_B, Map.of("itching", 8));
+		long recordIdA = createRecord(bearer, DATE_A, Map.of("pain", 2));
+		long recordIdB = createRecord(bearer, DATE_B, Map.of("pain", 8));
 
 		mockMvc.perform(comparison(bearer, DATE_A, DATE_B))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.A.date").value("2026-05-01"))
 			.andExpect(jsonPath("$.data.A.recordId").value(recordIdA))
 			.andExpect(jsonPath("$.data.A.skinConditions[0].bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.A.skinConditions[0].symptoms.itching").value(2))
+			.andExpect(jsonPath("$.data.A.skinConditions[0].symptoms.pain").value(2))
 			.andExpect(jsonPath("$.data.A.sleepHours").value(6.0))
 			.andExpect(jsonPath("$.data.A.lifestyle.outdoorActivity").value("MEDIUM"))
 			.andExpect(jsonPath("$.data.A.notes").value("메모A"))
 			.andExpect(jsonPath("$.data.A.photos").isEmpty())
 			.andExpect(jsonPath("$.data.B.date").value("2026-05-10"))
 			.andExpect(jsonPath("$.data.B.recordId").value(recordIdB))
-			.andExpect(jsonPath("$.data.B.skinConditions[0].symptoms.itching").value(8));
+			.andExpect(jsonPath("$.data.B.skinConditions[0].symptoms.pain").value(8));
 	}
 
 	@Test
 	void 기록이_없는_날짜는_null이다() throws Exception {
 		String bearer = newMemberBearer();
-		createRecord(bearer, DATE_A, Map.of("itching", 2));
+		createRecord(bearer, DATE_A, Map.of("pain", 2));
 
 		mockMvc.perform(comparison(bearer, DATE_A, DATE_B))
 			.andExpect(status().isOk())
@@ -54,7 +54,7 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 
 	@Test
 	void 다른_회원의_기록은_가져오지_않는다() throws Exception {
-		createRecord(newMemberBearer(), DATE_A, Map.of("itching", 2));
+		createRecord(newMemberBearer(), DATE_A, Map.of("pain", 2));
 
 		mockMvc.perform(comparison(newMemberBearer(), DATE_A, DATE_B))
 			.andExpect(status().isOk())
@@ -92,9 +92,9 @@ class AnalysisComparisonIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.A.painIndex").value(0))
 			.andExpect(jsonPath("$.data.A.sleepScore").value(4))
 			.andExpect(jsonPath("$.data.A.medication").value(true))
-			// 정의된 순서(피부건조증이 홍반보다 먼저)로 내려온다.
-			.andExpect(jsonPath("$.data.A.skinSigns[0]").value("XEROSIS"))
-			.andExpect(jsonPath("$.data.A.skinSigns[1]").value("ERYTHEMA"))
+			// 정의된 순서(홍반이 건조증보다 먼저)로 내려온다.
+			.andExpect(jsonPath("$.data.A.skinSigns[0]").value("ERYTHEMA"))
+			.andExpect(jsonPath("$.data.A.skinSigns[1]").value("XEROSIS"))
 			.andExpect(jsonPath("$.data.B").doesNotExist());
 	}
 

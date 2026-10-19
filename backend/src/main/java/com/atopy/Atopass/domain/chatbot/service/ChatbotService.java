@@ -254,7 +254,7 @@ public class ChatbotService {
 		}
 		return switch (askingField) {
 			case "painIndex" -> "오늘 피부 때문에 느낀 고통은 0~10 중 몇 점인가요? (0은 없음, 10은 매우 심함)";
-			case "symptoms" -> "그 부위의 증상 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
+			case "symptoms" -> "그 부위의 고통 정도를 0~10점으로 알려 주세요. (0은 없음, 10은 매우 심함)";
 			case "sleepHours" -> "어젯밤 몇 시간 주무셨나요?";
 			case "medication" -> "오늘 약을 복용하셨나요?";
 			case "skinSigns" -> "오늘 나타난 증상을 모두 골라 주세요. 하나도 없으면 '없어요'를 눌러 주세요.";

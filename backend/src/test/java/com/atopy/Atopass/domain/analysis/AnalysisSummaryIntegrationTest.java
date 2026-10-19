@@ -46,7 +46,7 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 	@Test
 	void 기록이_7건_이상이면_평균에서_크게_벗어난_구간을_알려준다() throws Exception {
 		String bearer = newMemberBearer();
-		// 가려움이 6일은 2점, 마지막 이틀은 9점
+		// 고통 점수가 6일은 2점, 마지막 이틀은 9점
 		for (int day = 0; day < 8; day++) {
 			createRecord(bearer, START.plusDays(day), day >= 6 ? 9 : 2);
 		}
@@ -58,12 +58,12 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.insights.length()").value(1))
 			.andExpect(jsonPath("$.data.insights[0].type").value("SYMPTOM_CHANGE"))
 			.andExpect(jsonPath("$.data.insights[0].bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.insights[0].symptom").value("itching"))
+			.andExpect(jsonPath("$.data.insights[0].symptom").value("pain"))
 			.andExpect(jsonPath("$.data.insights[0].direction").value("HIGH"))
 			.andExpect(jsonPath("$.data.insights[0].startDate").value("2026-03-07"))
 			.andExpect(jsonPath("$.data.insights[0].endDate").value("2026-03-08"))
 			.andExpect(jsonPath("$.data.insights[0].message")
-				.value("팔 가려움 점수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
+				.value("팔 고통 점수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)"));
 	}
 
 	@Test
@@ -172,7 +172,7 @@ class AnalysisSummaryIntegrationTest extends ApiTestSupport {
 	private void createRecord(String bearer, LocalDate date, int itching) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
-		condition.put("symptoms", Map.of("itching", itching));
+		condition.put("symptoms", Map.of("pain", itching));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));

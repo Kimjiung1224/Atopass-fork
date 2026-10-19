@@ -31,9 +31,8 @@ class RecordIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.recordId").value(id))
 			.andExpect(jsonPath("$.data.recordDate").value("2026-10-10"))
 			.andExpect(jsonPath("$.data.skinConditions[0].bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").value(4))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.redness").value(3))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").doesNotExist())
+			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").value(4))
+			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").doesNotExist())
 			.andExpect(jsonPath("$.data.sleepHours").value(6.0))
 			.andExpect(jsonPath("$.data.lifestyle.alcohol").value(false))
 			.andExpect(jsonPath("$.data.lifestyle.outdoorActivity").value("MEDIUM"))
@@ -57,7 +56,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 		String bearer = newMemberBearer();
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", "2026-10-12");
-		body.put("skinConditions", List.of(condition("FACE", Map.of("dryness", 2))));
+		body.put("skinConditions", List.of(condition("FACE", Map.of("pain", 2))));
 
 		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated())
@@ -93,20 +92,20 @@ class RecordIntegrationTest extends ApiTestSupport {
 	void 점수가_범위를_벗어나면_INVALID_SCORE_RANGE와_필드_상세를_반환한다() throws Exception {
 		String bearer = newMemberBearer();
 		Map<String, Object> body = recordBody("2026-10-15");
-		body.put("skinConditions", List.of(condition("ARM", Map.of("itching", 11, "dryness", -1))));
+		body.put("skinConditions", List.of(condition("ARM", Map.of("pain", 11)), condition("LEG", Map.of("pain", -1))));
 
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_SCORE_RANGE"))
-			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditions[0].symptoms.itching')]").exists())
-			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditions[0].symptoms.dryness')]").exists());
+			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditions[0].symptoms.pain')]").exists())
+			.andExpect(jsonPath("$.error.details[?(@.field=='skinConditions[1].symptoms.pain')]").exists());
 	}
 
 	@Test
 	void 점수_0과_10은_허용된다() throws Exception {
 		String bearer = newMemberBearer();
 		Map<String, Object> body = recordBody("2026-10-16");
-		body.put("skinConditions", List.of(condition("ARM", Map.of("itching", 0, "dryness", 10))));
+		body.put("skinConditions", List.of(condition("ARM", Map.of("pain", 0)), condition("LEG", Map.of("pain", 10))));
 
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated());
@@ -118,7 +117,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 		Map<String, Object> neck = new LinkedHashMap<>(condition("NECK", Map.of("pain", 3)));
 		neck.put("skinSigns", List.of("ERYTHEMA"));
 		Map<String, Object> leftHand = new LinkedHashMap<>(condition("LEFT_HAND", Map.of("pain", 5)));
-		leftHand.put("skinSigns", List.of("SCALING"));
+		leftHand.put("skinSigns", List.of("OOZING"));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", "2026-10-17");
 		body.put("skinConditions", List.of(neck, leftHand, condition("BACK", Map.of("pain", 1))));
@@ -130,15 +129,15 @@ class RecordIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(get("/api/v1/records/" + id).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.skinConditions[?(@.bodyPart=='NECK')].skinSigns[0]").value("ERYTHEMA"))
-			.andExpect(jsonPath("$.data.skinConditions[?(@.bodyPart=='LEFT_HAND')].skinSigns[0]").value("SCALING"))
-			.andExpect(jsonPath("$.data.skinSigns", containsInAnyOrder("ERYTHEMA", "SCALING")));
+			.andExpect(jsonPath("$.data.skinConditions[?(@.bodyPart=='LEFT_HAND')].skinSigns[0]").value("OOZING"))
+			.andExpect(jsonPath("$.data.skinSigns", containsInAnyOrder("ERYTHEMA", "OOZING")));
 
 		// 부위에서 증상을 지우면 하루의 증상에서도 빠진다
 		neck.put("skinSigns", List.of());
 		body.put("skinConditions", List.of(neck, leftHand));
 		mockMvc.perform(withJson(put("/api/v1/records/" + id).header(AUTH, bearer), body))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.skinSigns", contains("SCALING")));
+			.andExpect(jsonPath("$.data.skinSigns", contains("OOZING")));
 	}
 
 	@Test
@@ -163,8 +162,8 @@ class RecordIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.sleepScore").value(4))
 			.andExpect(jsonPath("$.data.medication").value(true))
 			.andExpect(jsonPath("$.data.skinSigns.length()").value(2))
-			.andExpect(jsonPath("$.data.skinSigns[0]").value("XEROSIS"))
-			.andExpect(jsonPath("$.data.skinSigns[1]").value("EXCORIATION"));
+			.andExpect(jsonPath("$.data.skinSigns[0]").value("EXCORIATION"))
+			.andExpect(jsonPath("$.data.skinSigns[1]").value("XEROSIS"));
 
 		mockMvc.perform(get("/api/v1/records").header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.content[0].painIndex").value(6))
@@ -223,7 +222,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 		String bearer = newMemberBearer();
 
 		Map<String, Object> unknownPart = recordBody("2026-10-17");
-		unknownPart.put("skinConditions", List.of(condition("TAIL", Map.of("itching", 3))));
+		unknownPart.put("skinConditions", List.of(condition("TAIL", Map.of("pain", 3))));
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), unknownPart))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
@@ -236,7 +235,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 
 		Map<String, Object> duplicate = recordBody("2026-10-17");
 		duplicate.put("skinConditions", List.of(
-			condition("ARM", Map.of("itching", 3)), condition("ARM", Map.of("redness", 2))));
+			condition("ARM", Map.of("pain", 3)), condition("ARM", Map.of("pain", 2))));
 		mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), duplicate))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
@@ -278,8 +277,8 @@ class RecordIntegrationTest extends ApiTestSupport {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", "2026-10-19");
 		body.put("skinConditions", List.of(
-			condition("ARM", Map.of("itching", 1, "pain", 7)),
-			condition("LEG", Map.of("dryness", 5))));
+			condition("ARM", Map.of("pain", 7)),
+			condition("LEG", Map.of("pain", 5))));
 		body.put("notes", "수정함");
 
 		mockMvc.perform(withJson(put("/api/v1/records/" + id).header(AUTH, bearer), body))
@@ -287,25 +286,21 @@ class RecordIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.skinConditions.length()").value(2))
 			// 부위는 BodyPart 선언 순서(마네킹 부위, 예전 부위 CHEST~FOOT)로 내려간다.
 			.andExpect(jsonPath("$.data.skinConditions[0].bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").value(1))
 			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").value(7))
 			.andExpect(jsonPath("$.data.skinConditions[1].bodyPart").value("LEG"))
-			.andExpect(jsonPath("$.data.skinConditions[1].symptoms.dryness").value(5))
-			// 이전에 있던 stinging·redness는 사라지고, 생략한 수면·생활 정보는 null이 된다.
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.stinging").doesNotExist())
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.redness").doesNotExist())
+			.andExpect(jsonPath("$.data.skinConditions[1].symptoms.pain").value(5))
+			// 생략한 수면·생활 정보는 null이 된다.
 			.andExpect(jsonPath("$.data.sleepHours").doesNotExist())
 			.andExpect(jsonPath("$.data.notes").value("수정함"));
 
 		// 부위를 줄여서 다시 수정해도 제약 위반 없이 반영된다.
 		Map<String, Object> shrink = new LinkedHashMap<>();
 		shrink.put("recordDate", "2026-10-19");
-		shrink.put("skinConditions", List.of(condition("ARM", Map.of("itching", 2))));
+		shrink.put("skinConditions", List.of(condition("ARM", Map.of("pain", 2))));
 		mockMvc.perform(withJson(put("/api/v1/records/" + id).header(AUTH, bearer), shrink))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.skinConditions.length()").value(1))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").value(2))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").doesNotExist());
+			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").value(2));
 	}
 
 	@Test
@@ -385,7 +380,7 @@ class RecordIntegrationTest extends ApiTestSupport {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date);
 		body.put("skinConditions", List.of(
-			condition("ARM", Map.of("itching", 4, "stinging", 2, "redness", 3))));
+			condition("ARM", Map.of("pain", 4))));
 		body.put("sleepHours", 6);
 		body.put("lifestyle", Map.of("alcohol", false, "outdoorActivity", "MEDIUM"));
 		body.put("notes", "저녁에 팔 부위가 가려웠음");

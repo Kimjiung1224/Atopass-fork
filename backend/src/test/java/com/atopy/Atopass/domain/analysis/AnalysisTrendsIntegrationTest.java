@@ -22,11 +22,11 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	@Test
 	void 부위와_증상이_기록된_날짜만_포인트로_준다() throws Exception {
 		String bearer = newMemberBearer();
-		long firstId = createRecord(bearer, START, "ARM", Map.of("itching", 3));
+		long firstId = createRecord(bearer, START, "ARM", Map.of("pain", 3));
 		// 둘째 날은 기록 자체가 없음
-		long secondId = createRecord(bearer, START.plusDays(2), "ARM", Map.of("itching", 5));
+		long secondId = createRecord(bearer, START.plusDays(2), "ARM", Map.of("pain", 5));
 
-		mockMvc.perform(trends(bearer, "ARM", "itching", START, START.plusDays(5)))
+		mockMvc.perform(trends(bearer, "ARM", "pain", START, START.plusDays(5)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.bodyPart").doesNotExist())
 			.andExpect(jsonPath("$.data.symptom").doesNotExist())
@@ -40,12 +40,12 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 다른_부위나_증상은_섞이지_않는다() throws Exception {
+	void 다른_부위는_섞이지_않는다() throws Exception {
 		String bearer = newMemberBearer();
-		createRecord(bearer, START, "ARM", Map.of("itching", 3, "redness", 7));
-		createRecord(bearer, START.plusDays(1), "LEG", Map.of("itching", 9));
+		createRecord(bearer, START, "ARM", Map.of("pain", 3));
+		createRecord(bearer, START.plusDays(1), "LEG", Map.of("pain", 9));
 
-		mockMvc.perform(trends(bearer, "ARM", "itching", START, START.plusDays(5)))
+		mockMvc.perform(trends(bearer, "ARM", "pain", START, START.plusDays(5)))
 			.andExpect(jsonPath("$.data.points.length()").value(1))
 			.andExpect(jsonPath("$.data.points[0].score").value(3));
 	}
@@ -53,17 +53,17 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	@Test
 	void 다른_회원의_기록은_섞이지_않는다() throws Exception {
 		String bearer = newMemberBearer();
-		createRecord(bearer, START, "ARM", Map.of("itching", 3));
-		createRecord(newMemberBearer(), START, "ARM", Map.of("itching", 9));
+		createRecord(bearer, START, "ARM", Map.of("pain", 3));
+		createRecord(newMemberBearer(), START, "ARM", Map.of("pain", 9));
 
-		mockMvc.perform(trends(bearer, "ARM", "itching", START, START.plusDays(5)))
+		mockMvc.perform(trends(bearer, "ARM", "pain", START, START.plusDays(5)))
 			.andExpect(jsonPath("$.data.points.length()").value(1))
 			.andExpect(jsonPath("$.data.points[0].score").value(3));
 	}
 
 	@Test
 	void 시작일이_종료일보다_늦으면_400이다() throws Exception {
-		mockMvc.perform(trends(newMemberBearer(), "ARM", "itching", START.plusDays(5), START))
+		mockMvc.perform(trends(newMemberBearer(), "ARM", "pain", START.plusDays(5), START))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
 	}
@@ -72,7 +72,7 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	void 잘못된_부위나_증상_값은_400이다() throws Exception {
 		String bearer = newMemberBearer();
 
-		mockMvc.perform(trends(bearer, "없는부위", "itching", START, START.plusDays(5)))
+		mockMvc.perform(trends(bearer, "없는부위", "pain", START, START.plusDays(5)))
 			.andExpect(status().isBadRequest());
 		mockMvc.perform(trends(bearer, "ARM", "없는증상", START, START.plusDays(5)))
 			.andExpect(status().isBadRequest());
@@ -81,7 +81,7 @@ class AnalysisTrendsIntegrationTest extends ApiTestSupport {
 	@Test
 	void 토큰이_없으면_401이다() throws Exception {
 		mockMvc.perform(get("/api/v1/analysis/trends")
-				.param("bodyPart", "ARM").param("symptom", "itching")
+				.param("bodyPart", "ARM").param("symptom", "pain")
 				.param("startDate", "2026-04-01").param("endDate", "2026-04-05"))
 			.andExpect(status().isUnauthorized());
 	}

@@ -93,7 +93,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "어제 몇 시간 주무셨나요?",
-			 "updates": {"painIndex": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}, "finished": false}""");
+			 "updates": {"painIndex": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4}}]}, "finished": false}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 6점이고 팔 가려움이 4점이에요"))
 			.andExpect(status().isOk())
@@ -104,7 +104,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"))
 			.andExpect(jsonPath("$.data.draft.painIndex").value(6))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("ARM"))
-			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.itching").value(4));
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4));
 	}
 
 	@Test
@@ -169,7 +169,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}}""");
+			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4}}]}}""");
 		mockMvc.perform(sendMessage(bearer, session, "팔이 4점"));
 
 		llm.enqueue("{\"understood\": true, \"reply\": \"생활은요?\", \"updates\": {\"sleepHours\": 6}}");
@@ -179,7 +179,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		assertThat(llm.lastMessages()).extracting(t -> t.role().name()).containsExactly("USER", "ASSISTANT", "USER");
 		assertThat(llm.lastMessages().get(0).content()).isEqualTo("팔이 4점");
 		assertThat(llm.lastMessages().get(2).content()).isEqualTo("6시간 잤어요");
-		assertThat(llm.lastSystemPrompt()).contains("\"ARM\":{\"itching\":4}");
+		assertThat(llm.lastSystemPrompt()).contains("\"ARM\":{\"pain\":4}");
 		assertThat(llm.lastSystemPrompt()).doesNotContain("@example.com");
 	}
 
@@ -189,12 +189,12 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "다른 증상도 있으신가요?",
-			 "updates": {"conditions": {"FACE": {"itching": 8}}}}""");
+			 "updates": {"conditions": {"FACE": {"pain": 8}}}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "8"))
 			.andExpect(jsonPath("$.data.understood").value(true))
 			.andExpect(jsonPath("$.data.draft.skinConditions[0].bodyPart").value("FACE"))
-			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.itching").value(8));
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(8));
 	}
 
 	@Test
@@ -205,11 +205,26 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(sendMessage(bearer, session, "안녕하세요"));
 
 		assertThat(llm.lastSystemPrompt())
-			.contains("\"conditions\": [{\"bodyPart\": \"FACE\", \"symptoms\": {\"itching\": 8}}]");
+			.contains("\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 8, \"skinSigns\": [\"ITCHING\", \"ERYTHEMA\"]}]");
 	}
 
 	@Test
-	void 프롬프트가_증상_점수를_일정한_문구로_하나씩_묻도록_안내한다() throws Exception {
+	void 프롬프트에_새_증상_목록과_쉬운_말_설명이_들어간다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(sendMessage(bearer, session, "진물이 나요"));
+
+		assertThat(llm.lastSystemPrompt())
+			.contains("- OOZING 진물/딱지 (상처에서 진물이 나오거나 딱지가 앉음 / 진물이 나요")
+			.contains("- EDEMA 부종/구진(결절)")
+			.contains("- ITCHING 가려움")
+			.contains("일상적인 말로 증상을 이야기합니다")
+			.doesNotContain("PAPULE")
+			.doesNotContain("SCALING");
+	}
+
+	@Test
+	void 프롬프트가_부위_고통_점수를_일정한_문구로_하나씩_묻도록_안내한다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
@@ -217,7 +232,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(sendMessage(bearer, session, "팔이 가려워요"));
 
 		assertThat(llm.lastSystemPrompt())
-			.contains("{증상} 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
+			.contains("{부위}의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
 			.contains("한 번에 하나씩 차례로 묻습니다")
 			.contains("followUp을 true로");
 	}
@@ -228,7 +243,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "알겠어요",
-			 "updates": {"sleepHours": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 11}}]}}""");
+			 "updates": {"sleepHours": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 11}}]}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "가려움 11점"))
 			.andExpect(status().isOk())
@@ -265,7 +280,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		llm.enqueue("{\"understood\": true, \"updates\": {\"medication\": true}}");
 		mockMvc.perform(sendMessage(bearer, session, "예"))
 			.andExpect(jsonPath("$.data.pendingFields[0]").value("skinSigns"));
-		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"PAPULE\"]}}");
+		llm.enqueue("{\"understood\": true, \"updates\": {\"skinSigns\": [\"ERYTHEMA\", \"EDEMA\"]}}");
 		mockMvc.perform(sendMessage(bearer, session, "2, 4"))
 			.andExpect(jsonPath("$.data.reply").value("평소와 다른 점이 있으면 500자 이내로 적어 주세요. 없으면 '없어요'를 눌러 주세요."));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"notes\": \"새 보습제를 썼어요\"}}");
@@ -294,7 +309,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 				"어떤 증상인지 알려 주세요. 예: \"고통은 6점이고 잠은 6시간 잤어요.\""));
 
 		// 한 번 해석에 성공하면 다시 처음부터 센다.
-		llm.enqueue("{\"understood\": true, \"reply\": \"수면은요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"itching\": 3}}]}}");
+		llm.enqueue("{\"understood\": true, \"reply\": \"수면은요?\", \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"pain\": 3}}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "팔 3점"))
 			.andExpect(jsonPath("$.data.understood").value(true));
 		llm.enqueue("엉뚱한 응답");
@@ -308,7 +323,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 		llm.enqueue("""
 			{"understood": true, "reply": "네",
-			 "updates": {"conditions": [{"bodyPart": "TAIL", "symptoms": {"itching": 4}}]}}""");
+			 "updates": {"conditions": [{"bodyPart": "TAIL", "symptoms": {"pain": 4}}]}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "꼬리가 가려워요"))
 			.andExpect(jsonPath("$.data.understood").value(false))
@@ -380,7 +395,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		String response = mockMvc.perform(withJson(
 				post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-10", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-10", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.data.recordId").isNumber())
 			.andExpect(jsonPath("$.data.recordDate").value("2026-10-10"))
@@ -389,7 +404,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		// 일반 기록 API로도 조회된다.
 		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
-			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.itching").value(4))
+			.andExpect(jsonPath("$.data.skinConditions[0].symptoms.pain").value(4))
 			.andExpect(jsonPath("$.data.sleepHours").value(6.0));
 
 		// 닫힌 세션: 메시지·재저장은 409, 대화 조회는 가능하다.
@@ -397,7 +412,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.error.code").value("SESSION_CLOSED"));
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-11", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-11", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.error.code").value("SESSION_CLOSED"));
 		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer))
@@ -413,13 +428,13 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-12", false, Map.of("itching", 4), 6)))
+				saveBody("2026-10-12", false, Map.of("pain", 4), 6)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("DRAFT_NOT_CONFIRMED"));
 
 		// 저장되지 않았으므로 같은 날짜에 다시 확인해서 저장할 수 있다.
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-12", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-12", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isCreated());
 	}
 
@@ -428,12 +443,12 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-13", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-13", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isCreated());
 		String second = createSession(bearer, "RECORD");
 
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + second + "/records").header(AUTH, bearer),
-				saveBody("2026-10-13", true, Map.of("itching", 2), 5)))
+				saveBody("2026-10-13", true, Map.of("pain", 2), 5)))
 			.andExpect(status().isConflict())
 			.andExpect(jsonPath("$.error.code").value("RECORD_ALREADY_EXISTS"));
 
@@ -449,7 +464,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "RECORD");
 
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-14", true, Map.of("itching", 11), 6)))
+				saveBody("2026-10-14", true, Map.of("pain", 11), 6)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_SCORE_RANGE"));
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
@@ -478,7 +493,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.draft").doesNotExist());
 
 		assertThat(llm.lastSystemPrompt())
-			.contains(yesterday + ": 팔(가려움 4)")
+			.contains(yesterday + ": 팔(고통 4)")
 			.contains("메모: 밤에 많이 긁음")
 			.doesNotContain("다른 사람의 비밀 메모")
 			.doesNotContain("@example.com");
@@ -501,7 +516,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String session = createSession(bearer, "QUERY");
 
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer),
-				saveBody("2026-10-15", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-15", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.error.code").value("INVALID_INPUT"));
 	}
@@ -521,7 +536,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, other))
 			.andExpect(status().isNotFound());
 		mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, other),
-				saveBody("2026-10-16", true, Map.of("itching", 4), 6)))
+				saveBody("2026-10-16", true, Map.of("pain", 4), 6)))
 			.andExpect(status().isNotFound());
 		assertThat(llm.callCount()).isZero();
 	}
@@ -591,7 +606,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	private void createRecord(String bearer, LocalDate date, int itching, String notes) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
-		condition.put("symptoms", Map.of("itching", itching));
+		condition.put("symptoms", Map.of("pain", itching));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));

@@ -148,7 +148,7 @@ class PhotoIntegrationTest extends ApiTestSupport {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date);
 		body.put("skinConditions", List.of(
-			Map.of("bodyPart", "ARM", "symptoms", Map.of("itching", 4))));
+			Map.of("bodyPart", "ARM", "symptoms", Map.of("pain", 4))));
 		String response = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), body))
 			.andExpect(status().isCreated())
 			.andReturn().getResponse().getContentAsString();

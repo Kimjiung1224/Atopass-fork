@@ -81,7 +81,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 			.andExpect(jsonPath("$.data.messages[0].content").value("6점"))
 			.andExpect(jsonPath("$.data.messages[2].content").value("7.5시간"))
 			.andExpect(jsonPath("$.data.messages[4].content").value("아니오"))
-			.andExpect(jsonPath("$.data.messages[6].content").value("피부건조증, 홍반"))
+			.andExpect(jsonPath("$.data.messages[6].content").value("홍반, 건조증"))
 			.andExpect(jsonPath("$.data.messages[8].content").value("없어요"));
 		mockMvc.perform(get(url(session, "draft")).header(AUTH, bearer))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
@@ -183,7 +183,7 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 		mockMvc.perform(choice(bearer, session, "painIndex", 5)).andExpect(status().isBadRequest());
 
 		llm.enqueue("{\"understood\": true, \"reply\": \"몇 점인가요?\","
-			+ " \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"itching\": 6}}]}}");
+			+ " \"updates\": {\"conditions\": [{\"bodyPart\": \"ARM\", \"symptoms\": {\"pain\": 6}}]}}");
 		mockMvc.perform(sendMessage(bearer, session, "팔이요, 6점"))
 			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
 			.andExpect(jsonPath("$.data.reply").value(PAIN_QUESTION));

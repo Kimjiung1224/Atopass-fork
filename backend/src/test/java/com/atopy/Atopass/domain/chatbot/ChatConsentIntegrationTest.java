@@ -169,7 +169,7 @@ class ChatConsentIntegrationTest extends ApiTestSupport {
 			.andReturn().getResponse().getContentAsString());
 		llm.enqueue("""
 			{"understood": true, "reply": "수면은요?",
-			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}}""");
+			 "updates": {"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4}}]}}""");
 		mockMvc.perform(sendMessage(bearer, session, "팔 4점")).andExpect(status().isOk());
 
 		mockMvc.perform(delete(CONSENT).header(AUTH, bearer)).andExpect(status().isNoContent());
@@ -181,7 +181,7 @@ class ChatConsentIntegrationTest extends ApiTestSupport {
 		// 이미 받은 응답을 사용자가 확인해 저장하는 것도 LLM 호출이 없으므로 가능하다.
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
-		condition.put("symptoms", Map.of("itching", 4));
+		condition.put("symptoms", Map.of("pain", 4));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", "2026-10-10");
 		body.put("confirmed", true);
