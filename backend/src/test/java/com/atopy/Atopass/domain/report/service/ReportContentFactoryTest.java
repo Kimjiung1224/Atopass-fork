@@ -89,7 +89,7 @@ class ReportContentFactoryTest {
 
 	private DayEntry day(int plusDays, int itching) {
 		Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
-		conditions.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.ITCHING, itching)));
+		conditions.put(BodyPart.ARM, new EnumMap<>(Map.of(Symptom.PAIN, itching)));
 		return new DayEntry(START.plusDays(plusDays), conditions, null, null, null, null, List.of());
 	}
 

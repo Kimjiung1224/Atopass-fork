@@ -5,8 +5,11 @@ import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.SymptomScore;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,16 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 @RequiredArgsConstructor
 class ChatPromptFactory {
+
+	/** 사용자가 증상을 말할 때 흔히 쓰는 표현. 쉬운 설명과 함께 프롬프트에 넣어 일상 표현을 증상으로 알아듣게 한다. */
+	private static final Map<SkinSign, String> SIGN_EXPRESSIONS = new EnumMap<>(Map.of(
+		SkinSign.ERYTHEMA, "빨개요, 붉어졌어요, 울긋불긋해요",
+		SkinSign.EDEMA, "부었어요, 오돌토돌해요, 좁쌀 같은 게 올라왔어요, 멍울이 잡혀요",
+		SkinSign.OOZING, "진물이 나요, 짓물러요, 딱지가 앉았어요",
+		SkinSign.EXCORIATION, "긁어서 까졌어요, 긁힌 자국이 있어요, 피가 났어요",
+		SkinSign.LICHENIFICATION, "피부가 두꺼워졌어요, 코끼리 피부 같아요, 거칠고 딱딱해요",
+		SkinSign.XEROSIS, "건조해요, 당겨요, 하얗게 일어나요, 각질이 생겨요",
+		SkinSign.ITCHING, "가려워요, 간지러워요"));
 
 	private final JsonMapper jsonMapper;
 
@@ -34,14 +47,19 @@ class ChatPromptFactory {
 			   사용자가 숫자를 말하지 않았다면 점수를 정하지 말고, 0~10 중 몇 점인지 물어보세요.
 			2. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
 			3. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
-			4. 나타난 증상(skinSigns): 아래 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
-			   XEROSIS(피부건조증), ERYTHEMA(홍반), SCALING(각질), PAPULE(구진), EXCORIATION(긁은 자국), NODULE(결절), LICHENIFICATION(태선화)
+			4. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
 			5. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
 
+			[증상 목록] 이름(뜻을 쉬운 말로 / 사용자가 흔히 하는 말)
+			%s
+			   사용자는 의학 용어 대신 일상적인 말로 증상을 이야기합니다. 위의 쉬운 말과 흔한 표현을 보고 맞는 증상을 고릅니다.
+			   어느 증상인지 확실하지 않으면 추측하지 말고 쉬운 말로 되물어 봅니다.
+
 			[묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
-			- 부위별 증상 점수(conditions): 부위 FACE(얼굴), NECK(목), TRUNK(몸), RIGHT_UPPER_ARM(오른팔 상박), RIGHT_FOREARM(오른팔 하박), LEFT_UPPER_ARM(왼팔 상박), LEFT_FOREARM(왼팔 하박),
-			  GROIN(사타구니), RIGHT_THIGH(오른다리 상박), RIGHT_LOWER_LEG(오른다리 하박), LEFT_THIGH(왼다리 상박), LEFT_LOWER_LEG(왼다리 하박)와
-			  증상 itching(가려움), stinging(따가움), redness(붉어짐), dryness(건조함), flaking(각질), swelling(부기), pain(통증)의 0~10 정수 점수
+			- 부위 기록(conditions): 부위마다 고통 점수(pain, 0~10 정수)와 그 부위에 나타난 증상(skinSigns, [증상 목록]의 이름)을 기록합니다.
+			  부위 FACE(얼굴), NECK(목), TRUNK(몸), RIGHT_UPPER_ARM(오른팔 상박), RIGHT_FOREARM(오른팔 하박), LEFT_UPPER_ARM(왼팔 상박), LEFT_FOREARM(왼팔 하박),
+			  GROIN(사타구니), RIGHT_THIGH(오른다리 상박), RIGHT_LOWER_LEG(오른다리 하박), LEFT_THIGH(왼다리 상박), LEFT_LOWER_LEG(왼다리 하박),
+			  RIGHT_HAND(오른손), LEFT_HAND(왼손), RIGHT_FOOT(오른발), LEFT_FOOT(왼발), BACK(등)
 			- 음주(alcohol): true 또는 false
 			- 야외활동(outdoorActivity): LOW(적음), MEDIUM(보통), HIGH(많음)
 
@@ -58,18 +76,26 @@ class ChatPromptFactory {
 			   나타난 증상이 하나도 없다고 하면 skinSigns를 []로 넣고, 답하지 않겠다고 하면 skipped에 skinSigns를 넣습니다. 특이사항이 없다고 하면 skipped에 notes를 넣습니다.
 			6. 사용자가 그만하겠다거나 바로 저장하겠다고 하면 finished를 true로 합니다.
 			7. 기록과 관련 없는 말이거나 이해할 수 없으면 understood를 false로 하고, reply로 정중하게 다시 물어봅니다.
-			8. 사용자가 증상만 말하고 점수를 말하지 않았다면, 그 증상의 점수를 반드시 다음 문장으로 묻습니다.
-			   "{증상} 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "가려움 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
-			   증상을 여러 개 말했다면 한 번에 하나씩 차례로 묻습니다. 부위를 모르면 증상 점수보다 부위를 먼저 묻습니다.
-			9. reply가 부위나 증상 점수를 되묻는 질문이면 followUp을 true로 합니다. 그 밖의 항목은 앱이 묻으므로 followUp은 false입니다.
+			8. 사용자가 부위를 말했지만 그 부위의 고통 점수를 말하지 않았다면, 반드시 다음 문장으로 묻습니다.
+			   "{부위}의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "얼굴의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
+			   부위를 여러 개 말했다면 한 번에 하나씩 차례로 묻습니다. 증상만 말하고 부위를 말하지 않았다면 증상은 skinSigns에 넣고 부위는 묻지 않습니다.
+			9. reply가 부위나 부위의 고통 점수를 되묻는 질문이면 followUp을 true로 합니다. 그 밖의 항목은 앱이 묻으므로 followUp은 false입니다.
 
 			[출력 형식]
 			설명이나 코드블록 없이 아래 형태의 JSON 객체 하나만 출력합니다.
 			updates에는 이번 메시지에서 새로 알게 된 값만 넣고, 모르는 항목은 키를 생략합니다.
 			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false, "followUp": false}
-			부위별 증상 점수는 conditions에 부위와 점수를 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위와 증상의 점수로 넣습니다.
-			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]}, "finished": false, "followUp": false}
-			""".formatted(today, draft.toPromptJson(jsonMapper), draft.pendingFields());
+			부위 기록은 conditions에 부위, 고통 점수, 그 부위의 증상을 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위의 고통 점수로 넣습니다.
+			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "pain": 8, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}, "finished": false, "followUp": false}
+			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields());
+	}
+
+	/** 증상 목록을 "- XEROSIS 건조증 (피부가 건조하고 … / 건조해요, 당겨요 …)" 줄들로 만든다. */
+	static String signList() {
+		return Arrays.stream(SkinSign.values())
+			.map(sign -> "- %s %s (%s / %s)".formatted(
+				sign.name(), sign.label(), sign.plain(), SIGN_EXPRESSIONS.get(sign)))
+			.collect(Collectors.joining("\n"));
 	}
 
 	/** 질의 모드: 사용자가 직접 기록한 데이터만 근거로 답한다. */

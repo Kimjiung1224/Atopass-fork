@@ -1,6 +1,6 @@
 // Swagger(openapi.yaml) components.schemas 기준
 
-/** 마네킹 부위(FACE~LEFT_LOWER_LEG, 팔·다리는 좌우·상박·하박)와 예전 부위(CHEST~FOOT) */
+/** 마네킹 부위(FACE~BACK, 팔·다리는 좌우·상박·하박, 손·발은 좌우, 등은 뒷면)와 예전 부위(CHEST~FOOT) */
 export type BodyPart =
   | 'FACE'
   | 'NECK'
@@ -14,34 +14,41 @@ export type BodyPart =
   | 'RIGHT_LOWER_LEG'
   | 'LEFT_THIGH'
   | 'LEFT_LOWER_LEG'
-  | 'CHEST'
+  | 'RIGHT_HAND'
+  | 'LEFT_HAND'
+  | 'RIGHT_FOOT'
+  | 'LEFT_FOOT'
   | 'BACK'
+  | 'CHEST'
   | 'ABDOMEN'
   | 'ARM'
   | 'HAND'
   | 'LEG'
   | 'FOOT';
 
-export type SymptomKey = 'itching' | 'stinging' | 'redness' | 'dryness' | 'flaking' | 'swelling' | 'pain';
+/** 부위 점수 항목 — 지금은 부위의 고통 점수(pain) 하나. 예전 증상별 점수(가려움 등)는 나타난 증상으로 옮겼다 */
+export type SymptomKey = 'pain';
 
 // 0~10 정수, 0은 "증상 없음". 기록하지 않은 증상은 키를 생략한다(0으로 채우지 않음)
 export type Symptoms = Partial<Record<SymptomKey, number>>;
 
 export type OutdoorActivity = 'LOW' | 'MEDIUM' | 'HIGH';
 
-/** 나타난 증상(있음/없음) — 피부건조증, 홍반, 각질, 구진, 긁은 자국, 결절, 태선화 */
+/** 나타난 증상(있음/없음) — 홍반, 부종/구진(결절), 진물/딱지, 긁은 자국(찰상), 태선화, 건조증, 가려움 */
 export type SkinSign =
-  | 'XEROSIS'
   | 'ERYTHEMA'
-  | 'SCALING'
-  | 'PAPULE'
+  | 'EDEMA'
+  | 'OOZING'
   | 'EXCORIATION'
-  | 'NODULE'
-  | 'LICHENIFICATION';
+  | 'LICHENIFICATION'
+  | 'XEROSIS'
+  | 'ITCHING';
 
 export interface SkinCondition {
   bodyPart: BodyPart;
   symptoms: Symptoms;
+  /** 이 부위에 나타난 증상. 없으면 생략하거나 빈 배열 */
+  skinSigns?: SkinSign[];
 }
 
 export interface Lifestyle {

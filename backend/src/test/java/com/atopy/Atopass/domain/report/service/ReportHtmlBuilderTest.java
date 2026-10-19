@@ -59,7 +59,7 @@ class ReportHtmlBuilderTest {
 			// 0도 기록한 값이므로 평균에 들어간다: (0 + 7) / 2
 			.contains("고통 지수 (기간 평균·최고)").contains("평균 3.5 · 최고 7 (2일 기록)")
 			.contains("고통 지수 <b>0점 → 7점</b>")
-			.contains("약 복용").contains("나타난 증상 피부건조증, 긁은 자국");
+			.contains("약 복용").contains("나타난 증상 건조증, 긁은 자국");
 	}
 
 	@Test
@@ -90,7 +90,7 @@ class ReportHtmlBuilderTest {
 
 		assertThat(html)
 			.contains("<h3>2026.03.02 (월)</h3>")
-			.contains("팔 가려움 <b>4점 → 7점</b> (03.01 기록 대비 +3)")
+			.contains("팔 고통 <b>4점 → 7점</b> (03.01 기록 대비 +3)")
 			.contains("<th>당일</th><td><b>음주 있음</b></td>")
 			.contains("<th>전날</th><td>수면 6시간 · 음주 없음 · 야외활동 보통</td>")
 			.contains("<th>메모</th><td>당일: 회식</td>");

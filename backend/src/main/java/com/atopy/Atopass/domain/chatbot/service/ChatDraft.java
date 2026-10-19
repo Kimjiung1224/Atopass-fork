@@ -30,7 +30,7 @@ import tools.jackson.databind.node.ObjectNode;
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
  *
  * <p>챗봇이 묻는 항목: 고통 지수(필수), 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
- * 부위별 증상 점수와 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
+ * 부위 기록(부위의 고통 점수와 그 부위에 나타난 증상)과 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  */
 public final class ChatDraft {
@@ -56,7 +56,10 @@ public final class ChatDraft {
 		OK, INVALID_SCORE, INVALID_PAIN_INDEX, INVALID_VALUE
 	}
 
+	/** 부위별 점수. 지금은 고통 점수(PAIN) 하나다. 부위만 말하고 점수가 없으면 빈 맵이다. */
 	private final Map<BodyPart, Map<Symptom, Integer>> conditions = new EnumMap<>(BodyPart.class);
+	/** 부위마다 나타난 증상 */
+	private final Map<BodyPart, Set<SkinSign>> conditionSigns = new EnumMap<>(BodyPart.class);
 	private Integer painIndex;
 	private BigDecimal sleepHours;
 	private Boolean medication;
@@ -81,6 +84,11 @@ public final class ChatDraft {
 		conditions.forEach((bodyPart, scores) -> {
 			ObjectNode scoresNode = conditionsNode.putObject(bodyPart.name());
 			scores.forEach((symptom, score) -> scoresNode.put(symptom.key(), score));
+			Set<SkinSign> signs = conditionSigns.get(bodyPart);
+			if (signs != null && !signs.isEmpty()) {
+				ArrayNode signsNode = scoresNode.putArray("skinSigns");
+				signs.forEach(sign -> signsNode.add(sign.name()));
+			}
 		});
 		if (painIndex != null) {
 			root.put("painIndex", painIndex);
@@ -132,6 +140,10 @@ public final class ChatDraft {
 						}
 					}
 					draft.conditions.put(bodyPart, scores);
+					Set<SkinSign> signs = readSigns(scoresNode.path("skinSigns"));
+					if (!signs.isEmpty()) {
+						draft.conditionSigns.put(bodyPart, signs);
+					}
 				}
 			}
 			if (root.path("painIndex").isInt()) {
@@ -144,10 +156,7 @@ public final class ChatDraft {
 				draft.medication = root.path("medication").booleanValue();
 			}
 			if (root.path("skinSigns").isArray()) {
-				draft.skinSigns = EnumSet.noneOf(SkinSign.class);
-				for (JsonNode item : root.path("skinSigns")) {
-					draft.skinSigns.add(SkinSign.valueOf(item.asString()));
-				}
+				draft.skinSigns = readSigns(root.path("skinSigns"));
 			}
 			if (root.path("alcohol").isBoolean()) {
 				draft.alcohol = root.path("alcohol").booleanValue();
@@ -170,11 +179,24 @@ public final class ChatDraft {
 		return draft;
 	}
 
+	/** 저장된 증상 이름을 읽는다. 증상 목록을 바꾸기 전에 저장된 이름(예: PAPULE)은 건너뛴다. */
+	private static Set<SkinSign> readSigns(JsonNode array) {
+		Set<SkinSign> signs = EnumSet.noneOf(SkinSign.class);
+		for (JsonNode item : array) {
+			try {
+				signs.add(SkinSign.valueOf(item.asString()));
+			} catch (IllegalArgumentException e) {
+				// 예전 증상 이름은 무시한다.
+			}
+		}
+		return signs;
+	}
+
 	// ── LLM이 알려 준 새 정보 반영 ──
 
 	/**
 	 * LLM 응답의 updates를 검증한 뒤 반영한다. 하나라도 규칙에 어긋나면 아무것도 반영하지 않는다.
-	 * 증상 점수는 0~10, 고통 지수는 0~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
+	 * 부위 고통 점수와 고통 지수는 0~10 정수만 허용하고, 모르는 부위·증상 이름은 값 오류로 본다.
 	 */
 	ApplyResult apply(JsonNode updates) {
 		if (updates == null || updates.isMissingNode() || updates.isNull()) {
@@ -188,8 +210,8 @@ public final class ChatDraft {
 
 		JsonNode conditionList = updates.path("conditions");
 		if (present(conditionList)) {
-			// 정해진 형식은 [{"bodyPart": "FACE", "symptoms": {"itching": 8}}]이지만,
-			// LLM이 {"FACE": {"itching": 8}}처럼 부위를 키로 쓰는 경우도 같은 뜻으로 받는다.
+			// 정해진 형식은 [{"bodyPart": "FACE", "pain": 6, "skinSigns": ["ITCHING"]}]이지만,
+			// LLM이 {"FACE": {"pain": 6}}처럼 부위를 키로 쓰거나 "symptoms": {"pain": 6}으로 감싸는 경우도 같은 뜻으로 받는다.
 			if (conditionList.isObject()) {
 				for (Map.Entry<String, JsonNode> entry : conditionList.properties()) {
 					ApplyResult result = next.applyCondition(entry.getKey(), entry.getValue());
@@ -202,7 +224,7 @@ public final class ChatDraft {
 					if (!item.isObject() || !item.path("bodyPart").isString()) {
 						return ApplyResult.INVALID_VALUE;
 					}
-					ApplyResult result = next.applyCondition(item.path("bodyPart").asString(), item.path("symptoms"));
+					ApplyResult result = next.applyCondition(item.path("bodyPart").asString(), item);
 					if (result != ApplyResult.OK) {
 						return result;
 					}
@@ -320,7 +342,8 @@ public final class ChatDraft {
 		return !node.isMissingNode() && !node.isNull();
 	}
 
-	private ApplyResult applyCondition(String bodyPartName, JsonNode symptoms) {
+	/** 부위 하나를 반영한다. item에는 고통 점수(pain 또는 symptoms.pain)와 그 부위에 나타난 증상(skinSigns)이 올 수 있다. */
+	private ApplyResult applyCondition(String bodyPartName, JsonNode item) {
 		BodyPart bodyPart;
 		try {
 			bodyPart = BodyPart.valueOf(bodyPartName.trim().toUpperCase(Locale.ROOT));
@@ -329,32 +352,54 @@ public final class ChatDraft {
 		}
 		Map<Symptom, Integer> scores = conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class));
 
-		if (!present(symptoms)) {
+		if (!present(item)) {
 			return ApplyResult.OK;
 		}
-		if (!symptoms.isObject()) {
+		if (!item.isObject()) {
 			return ApplyResult.INVALID_VALUE;
 		}
-		for (Map.Entry<String, JsonNode> entry : symptoms.properties()) {
-			Symptom symptom;
-			try {
-				symptom = Symptom.fromKey(entry.getKey());
-			} catch (IllegalArgumentException e) {
+		JsonNode wrapped = item.path("symptoms");
+		JsonNode pain = present(wrapped) ? wrapped.path(Symptom.PAIN.key()) : item.path(Symptom.PAIN.key());
+		if (present(wrapped)) {
+			// symptoms에는 고통 점수(pain)만 올 수 있다. 예전 증상 이름(itching 등)은 값 오류로 본다.
+			if (!wrapped.isObject()) {
 				return ApplyResult.INVALID_VALUE;
 			}
-			JsonNode value = entry.getValue();
-			if (value.isNull()) {
-				continue;
+			for (String key : wrapped.propertyNames()) {
+				if (!Symptom.PAIN.key().equals(key)) {
+					return ApplyResult.INVALID_VALUE;
+				}
 			}
+		}
+		if (present(pain)) {
 			// 4.0처럼 소수점이 붙은 값은 정수로 인정하지 않는다. 점수를 임의로 반올림하지 않기 위해서다.
-			if (!value.isInt()) {
-				return value.isNumber() ? ApplyResult.INVALID_SCORE : ApplyResult.INVALID_VALUE;
+			if (!pain.isInt()) {
+				return pain.isNumber() ? ApplyResult.INVALID_SCORE : ApplyResult.INVALID_VALUE;
 			}
-			int score = value.intValue();
+			int score = pain.intValue();
 			if (score < MIN_SCORE || score > MAX_SCORE) {
 				return ApplyResult.INVALID_SCORE;
 			}
-			scores.put(symptom, score);
+			scores.put(Symptom.PAIN, score);
+		}
+
+		JsonNode signs = item.path("skinSigns");
+		if (present(signs)) {
+			if (!signs.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			// 부위의 증상도 대화 중에 하나씩 말할 수 있으므로 기존 증상에 더한다.
+			Set<SkinSign> merged = conditionSigns.computeIfAbsent(bodyPart, k -> EnumSet.noneOf(SkinSign.class));
+			for (JsonNode sign : signs) {
+				if (!sign.isString()) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				try {
+					merged.add(SkinSign.valueOf(sign.asString().trim().toUpperCase(Locale.ROOT)));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+			}
 		}
 		return ApplyResult.OK;
 	}
@@ -363,7 +408,7 @@ public final class ChatDraft {
 
 	/**
 	 * 기록으로 저장하려면 꼭 필요한 항목이 모두 채워졌는지.
-	 * 고통 지수가 있어야 하고, 사용자가 말한 부위가 있다면 그 부위마다 증상 점수가 하나 이상 있어야 한다.
+	 * 고통 지수가 있어야 하고, 사용자가 말한 부위가 있다면 그 부위마다 고통 점수가 있어야 한다.
 	 */
 	public boolean requiredSatisfied() {
 		return painIndex != null && conditions.values().stream().noneMatch(Map::isEmpty);
@@ -401,7 +446,7 @@ public final class ChatDraft {
 
 	/**
 	 * 지금 물어볼 항목. 아직 입력되지 않은 항목 중 가장 먼저 필요한 것이고, 모두 채워졌으면 null이다.
-	 * 챗봇이 부위나 증상 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 고통 지수보다 먼저 symptoms다.
+	 * 챗봇이 부위나 부위 고통 점수를 되묻는 중이거나 점수가 빠진 부위가 있으면, 이어서 묻도록 고통 지수보다 먼저 symptoms다.
 	 */
 	public String askingField() {
 		if (followUp || conditions.values().stream().anyMatch(Map::isEmpty)) {
@@ -421,7 +466,8 @@ public final class ChatDraft {
 	public ChatDraftResponse toResponse() {
 		List<SkinConditionResponse> list = conditions.entrySet().stream()
 			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
-			.map(e -> new SkinConditionResponse(e.getKey(), SymptomsResponse.from(e.getValue())))
+			.map(e -> new SkinConditionResponse(e.getKey(), SymptomsResponse.from(e.getValue()),
+				List.copyOf(conditionSigns.getOrDefault(e.getKey(), EnumSet.noneOf(SkinSign.class)))))
 			.toList();
 		return new ChatDraftResponse(
 			list,
@@ -449,6 +495,8 @@ public final class ChatDraft {
 		ChatDraft copy = new ChatDraft();
 		conditions.forEach((bodyPart, scores) -> copy.conditions.put(bodyPart, new EnumMap<>(
 			scores.isEmpty() ? new EnumMap<>(Symptom.class) : scores)));
+		conditionSigns.forEach((bodyPart, signs) -> copy.conditionSigns.put(bodyPart, signs.isEmpty()
+			? EnumSet.noneOf(SkinSign.class) : EnumSet.copyOf(signs)));
 		copy.painIndex = painIndex;
 		copy.sleepHours = sleepHours;
 		copy.medication = medication;
@@ -465,6 +513,8 @@ public final class ChatDraft {
 	private void commit(ChatDraft next) {
 		conditions.clear();
 		conditions.putAll(next.conditions);
+		conditionSigns.clear();
+		conditionSigns.putAll(next.conditionSigns);
 		painIndex = next.painIndex;
 		sleepHours = next.sleepHours;
 		medication = next.medication;

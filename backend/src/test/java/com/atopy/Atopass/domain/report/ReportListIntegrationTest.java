@@ -110,7 +110,7 @@ class ReportListIntegrationTest extends ApiTestSupport {
 	private void createRecord(String bearer, LocalDate date, int itching) throws Exception {
 		Map<String, Object> condition = new LinkedHashMap<>();
 		condition.put("bodyPart", "ARM");
-		condition.put("symptoms", Map.of("itching", itching));
+		condition.put("symptoms", Map.of("pain", itching));
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("recordDate", date.toString());
 		body.put("skinConditions", List.of(condition));

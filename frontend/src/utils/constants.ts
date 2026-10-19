@@ -15,9 +15,13 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
   RIGHT_LOWER_LEG: '오른다리 하박',
   LEFT_THIGH: '왼다리 상박',
   LEFT_LOWER_LEG: '왼다리 하박',
-  // 예전 부위 — 팔·다리를 상박·하박으로 나누기 전 기록을 보여 줄 때만 쓴다
-  CHEST: '가슴',
+  RIGHT_HAND: '오른손',
+  LEFT_HAND: '왼손',
+  RIGHT_FOOT: '오른발',
+  LEFT_FOOT: '왼발',
   BACK: '등',
+  // 예전 부위 — 팔·다리를 나누기 전 기록을 보여 줄 때만 쓴다
+  CHEST: '가슴',
   ABDOMEN: '배',
   ARM: '팔',
   HAND: '손',
@@ -39,19 +43,18 @@ export const BODY_MAP_PARTS: BodyPart[] = [
   'RIGHT_LOWER_LEG',
   'LEFT_THIGH',
   'LEFT_LOWER_LEG',
+  'RIGHT_HAND',
+  'LEFT_HAND',
+  'RIGHT_FOOT',
+  'LEFT_FOOT',
+  'BACK',
 ];
 
 /** 부위별 고통 점수는 증상 하나(pain)로 저장한다 — 증상별 점수를 하나로 합친 값 */
 export const PART_PAIN_SYMPTOM: SymptomKey = 'pain';
 
 export const SYMPTOM_LABELS: Record<SymptomKey, string> = {
-  itching: '가려움',
-  stinging: '따가움',
-  redness: '붉은기',
-  dryness: '건조함',
-  flaking: '각질',
-  swelling: '부어오름',
-  pain: '통증',
+  pain: '고통',
 };
 
 export const OUTDOOR_ACTIVITY_LABELS: Record<OutdoorActivity, string> = {
@@ -88,15 +91,15 @@ export const OVERLAY_SERIES_COLORS = {
   humidity: '#eda100',
 } as const;
 
-/** 챗봇 질문 순서와 같은 번호 순서 (1 피부건조증 … 7 태선화) */
+/** 나타난 증상 7가지 — 이 순서로 보여 준다 (1 홍반 … 7 가려움). 서버 SkinSign 선언 순서와 같다 */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
-  XEROSIS: '피부건조증',
   ERYTHEMA: '홍반',
-  SCALING: '각질',
-  PAPULE: '구진',
-  EXCORIATION: '긁은 자국',
-  NODULE: '결절',
+  EDEMA: '부종/구진(결절)',
+  OOZING: '진물/딱지',
+  EXCORIATION: '긁은 자국(찰상)',
   LICHENIFICATION: '태선화',
+  XEROSIS: '건조증',
+  ITCHING: '가려움',
 };
 
 /** 수면 점수: 7~8시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */

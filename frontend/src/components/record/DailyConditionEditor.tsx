@@ -1,4 +1,5 @@
-import type { SkinSign } from '@/types/record';
+import type { SkinCondition, SkinSign } from '@/types/record';
+import { allSkinSigns } from '@/utils/bodyMap';
 import { EMPTY_TEXT, PAIN_INDEX_MAX, PAIN_INDEX_MIN, SKIN_SIGN_LABELS } from '@/utils/constants';
 
 interface Value {
@@ -10,23 +11,24 @@ interface Value {
 interface Props {
   painIndex: number | null | undefined;
   medication: boolean | null | undefined;
+  /** 부위 없이 고른 증상(예전 기록·챗봇). 부위마다 고른 증상은 skinConditions에 있다 */
   skinSigns: SkinSign[] | null | undefined;
+  skinConditions: SkinCondition[];
   onChange: (next: Value) => void;
 }
 
 const PAIN_INDEXES = Array.from({ length: PAIN_INDEX_MAX - PAIN_INDEX_MIN + 1 }, (_, i) => PAIN_INDEX_MIN + i);
-const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
-
-/** 고통 지수(0~10) + 약 복용 여부(예/아니오) + 나타난 증상 7가지(여러 개 선택) */
-export default function DailyConditionEditor({ painIndex, medication, skinSigns, onChange }: Props) {
+/**
+ * 고통 지수(0~10) + 약 복용 여부(예/아니오) + 나타난 증상.
+ * 나타난 증상은 부위별 기록에서 고른 증상을 모두 합쳐 보여 준다(예: 목 홍반, 왼손 진물/딱지 → 홍반, 각질).
+ * 부위 없이 남은 증상(예전 기록·챗봇)은 여기서 지울 수 있다.
+ */
+export default function DailyConditionEditor({ painIndex, medication, skinSigns, skinConditions, onChange }: Props) {
   const current: Value = { painIndex: painIndex ?? null, medication: medication ?? null, skinSigns: skinSigns ?? [] };
+  const shownSigns = allSkinSigns({ skinConditions, skinSigns: current.skinSigns });
 
-  const toggleSign = (sign: SkinSign) => {
-    const next = current.skinSigns.includes(sign)
-      ? current.skinSigns.filter((s) => s !== sign)
-      : SKIN_SIGNS.filter((s) => s === sign || current.skinSigns.includes(s));
-    onChange({ ...current, skinSigns: next });
-  };
+  const removeDailySign = (sign: SkinSign) =>
+    onChange({ ...current, skinSigns: current.skinSigns.filter((s) => s !== sign) });
 
   return (
     <div className="flex flex-col gap-5">
@@ -73,25 +75,40 @@ export default function DailyConditionEditor({ painIndex, medication, skinSigns,
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend className="mb-2 text-base text-gray-700">나타난 증상</legend>
-        <div className="grid grid-cols-2 gap-2">
-          {SKIN_SIGNS.map((sign, i) => {
-            const checked = current.skinSigns.includes(sign);
-            return (
-              <label
-                key={sign}
-                className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-base ${
-                  checked ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-gray-300 text-gray-700'
-                }`}
-              >
-                <input type="checkbox" checked={checked} onChange={() => toggleSign(sign)} className="size-4" />
-                {i + 1}. {SKIN_SIGN_LABELS[sign]}
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
+      <div>
+        <p className="mb-2 text-base text-gray-700">나타난 증상</p>
+        {shownSigns.length === 0 ? (
+          <p className="text-sm text-gray-400">아래 부위별 기록에서 부위를 누르고 증상을 골라 주세요.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {shownSigns.map((sign) => {
+              // 부위에서 고른 증상은 부위에서 지우고, 부위 없이 남은 증상만 여기서 지운다
+              const removable = current.skinSigns.includes(sign) && !partHasSign(skinConditions, sign);
+              return (
+                <li
+                  key={sign}
+                  className="flex items-center gap-1 rounded-full border border-emerald-600 bg-emerald-50 px-3 py-1 text-base text-emerald-700"
+                >
+                  {SKIN_SIGN_LABELS[sign]}
+                  {removable && (
+                    <button
+                      type="button"
+                      onClick={() => removeDailySign(sign)}
+                      aria-label={`${SKIN_SIGN_LABELS[sign]} 지우기`}
+                      className="-mr-1 px-1 text-emerald-700"
+                    >
+                      ×
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
+
+const partHasSign = (skinConditions: SkinCondition[], sign: SkinSign) =>
+  skinConditions.some((c) => c.skinSigns?.includes(sign));

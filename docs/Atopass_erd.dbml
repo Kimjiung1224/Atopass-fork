@@ -22,23 +22,17 @@ Enum body_part {
 }
 
 Enum symptom {
-  itching   [note: '가려움']
-  stinging  [note: '따가움']
-  redness   [note: '붉어짐']
-  dryness   [note: '건조함']
-  flaking   [note: '각질']
-  swelling  [note: '부기']
-  pain      [note: '통증']
+  PAIN      [note: '부위 고통 점수 (예전 증상별 점수는 skin_sign으로 옮김)']
 }
 
 Enum skin_sign {
-  XEROSIS         [note: '피부건조증']
   ERYTHEMA        [note: '홍반']
-  SCALING         [note: '각질']
-  PAPULE          [note: '구진']
-  EXCORIATION     [note: '긁은 자국']
-  NODULE          [note: '결절']
+  EDEMA           [note: '부종/구진(결절)']
+  OOZING          [note: '진물/딱지']
+  EXCORIATION     [note: '긁은 자국(찰상)']
   LICHENIFICATION [note: '태선화']
+  XEROSIS         [note: '건조증']
+  ITCHING         [note: '가려움']
 }
 
 Enum outdoor_activity {

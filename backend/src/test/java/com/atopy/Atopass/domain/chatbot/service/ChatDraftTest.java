@@ -78,7 +78,7 @@ class ChatDraftTest {
 		draft.apply(json("{\"skinSigns\": [\"lichenification\"]}"));
 		draft.apply(json("{\"skinSigns\": [\"XEROSIS\", \"LICHENIFICATION\"]}"));
 
-		assertThat(draft.toResponse().skinSigns()).containsExactly(SkinSign.XEROSIS, SkinSign.LICHENIFICATION);
+		assertThat(draft.toResponse().skinSigns()).containsExactly(SkinSign.LICHENIFICATION, SkinSign.XEROSIS);
 		assertThat(draft.pendingFields()).doesNotContain("skinSigns");
 	}
 
@@ -95,7 +95,8 @@ class ChatDraftTest {
 
 	@Test
 	void 모르는_증상_이름은_값_오류다() {
-		assertThat(ChatDraft.empty().apply(json("{\"skinSigns\": [\"ITCHING\"]}"))).isEqualTo(ApplyResult.INVALID_VALUE);
+		// 증상 목록을 바꾸기 전의 이름(PAPULE 등)도 모르는 이름이다.
+		assertThat(ChatDraft.empty().apply(json("{\"skinSigns\": [\"PAPULE\"]}"))).isEqualTo(ApplyResult.INVALID_VALUE);
 		assertThat(ChatDraft.empty().apply(json("{\"skinSigns\": \"XEROSIS\"}"))).isEqualTo(ApplyResult.INVALID_VALUE);
 	}
 
@@ -113,12 +114,12 @@ class ChatDraftTest {
 		ChatDraft draft = ChatDraft.empty();
 
 		ApplyResult result = draft.apply(json("""
-			{"painIndex": 5, "conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4, "redness": 0}}]}"""));
+			{"painIndex": 5, "conditions": [{"bodyPart": "ARM", "pain": 4, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}"""));
 
 		assertThat(result).isEqualTo(ApplyResult.OK);
-		assertThat(draft.conditions().get(BodyPart.ARM))
-			.containsEntry(Symptom.ITCHING, 4)
-			.containsEntry(Symptom.REDNESS, 0);
+		assertThat(draft.conditions().get(BodyPart.ARM)).containsEntry(Symptom.PAIN, 4);
+		assertThat(draft.toResponse().skinConditions().get(0).skinSigns())
+			.containsExactly(SkinSign.ERYTHEMA, SkinSign.ITCHING);
 		assertThat(draft.requiredSatisfied()).isTrue();
 	}
 
@@ -137,33 +138,33 @@ class ChatDraftTest {
 	void 점수가_범위를_벗어나면_아무것도_반영하지_않는다() {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}"""));
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4}}]}"""));
 
 		// 뒤의 점수가 잘못이면 앞의 sleepHours도 반영되지 않아야 한다.
 		ApplyResult result = draft.apply(json("""
-			{"sleepHours": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"dryness": 11}}]}"""));
+			{"sleepHours": 6, "conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 11}}]}"""));
 
 		assertThat(result).isEqualTo(ApplyResult.INVALID_SCORE);
-		assertThat(draft.conditions().get(BodyPart.ARM)).doesNotContainKey(Symptom.DRYNESS);
+		assertThat(draft.conditions().get(BodyPart.ARM)).containsEntry(Symptom.PAIN, 4);
 		assertThat(draft.pendingFields()).contains("sleepHours");
 	}
 
 	@Test
 	void 음수_점수와_소수_점수도_거부한다() {
 		assertThat(ChatDraft.empty().apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": -1}}]}"""))).isEqualTo(ApplyResult.INVALID_SCORE);
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": -1}}]}"""))).isEqualTo(ApplyResult.INVALID_SCORE);
 		assertThat(ChatDraft.empty().apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4.5}}]}"""))).isEqualTo(ApplyResult.INVALID_SCORE);
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 4.5}}]}"""))).isEqualTo(ApplyResult.INVALID_SCORE);
 	}
 
 	@Test
 	void 모르는_부위나_증상_이름은_값_오류다() {
 		assertThat(ChatDraft.empty().apply(json("""
-			{"conditions": [{"bodyPart": "TAIL", "symptoms": {"itching": 4}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
+			{"conditions": [{"bodyPart": "TAIL", "symptoms": {"pain": 4}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
 		assertThat(ChatDraft.empty().apply(json("""
 			{"conditions": [{"bodyPart": "ARM", "symptoms": {"hunger": 4}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
 		assertThat(ChatDraft.empty().apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": "많이"}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": "많이"}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
 	}
 
 	@Test
@@ -214,30 +215,38 @@ class ChatDraftTest {
 	}
 
 	@Test
-	void 같은_부위의_증상은_합쳐진다() {
+	void 같은_부위의_증상은_합쳐지고_점수는_새_값으로_바뀐다() {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}"""));
+			{"conditions": [{"bodyPart": "ARM", "pain": 4, "skinSigns": ["ITCHING"]}]}"""));
 		draft.apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"redness": 2, "itching": 6}}]}"""));
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"pain": 6}, "skinSigns": ["OOZING"]}]}"""));
 
-		assertThat(draft.conditions().get(BodyPart.ARM))
-			.containsEntry(Symptom.ITCHING, 6)
-			.containsEntry(Symptom.REDNESS, 2);
+		assertThat(draft.conditions().get(BodyPart.ARM)).containsEntry(Symptom.PAIN, 6);
+		assertThat(draft.toResponse().skinConditions().get(0).skinSigns())
+			.containsExactly(SkinSign.OOZING, SkinSign.ITCHING);
+	}
+
+	@Test
+	void 부위_점수에_예전_증상_이름을_쓰면_값_오류다() {
+		assertThat(ChatDraft.empty().apply(json("""
+			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
+		assertThat(ChatDraft.empty().apply(json("""
+			{"conditions": [{"bodyPart": "ARM", "pain": 4, "skinSigns": ["PAPULE"]}]}"""))).isEqualTo(ApplyResult.INVALID_VALUE);
 	}
 
 	@Test
 	void JSON으로_저장했다_복원해도_같다() {
 		ChatDraft draft = ChatDraft.empty();
 		draft.apply(json("""
-			{"conditions": [{"bodyPart": "ARM", "symptoms": {"itching": 4}}, {"bodyPart": "FACE"}],
-			 "painIndex": 7, "sleepHours": 6, "medication": true, "skinSigns": ["PAPULE", "ERYTHEMA"],
+			{"conditions": [{"bodyPart": "ARM", "pain": 4, "skinSigns": ["XEROSIS"]}, {"bodyPart": "FACE"}],
+			 "painIndex": 7, "sleepHours": 6, "medication": true, "skinSigns": ["EDEMA", "ERYTHEMA"],
 			 "alcohol": false, "outdoorActivity": "LOW", "notes": "메모", "skipped": ["notes"]}"""));
 
 		ChatDraft restored = ChatDraft.fromJson(mapper, draft.toJson(mapper));
 
 		assertThat(restored.toJson(mapper)).isEqualTo(draft.toJson(mapper));
-		assertThat(restored.toResponse().skinSigns()).containsExactly(SkinSign.ERYTHEMA, SkinSign.PAPULE);
+		assertThat(restored.toResponse().skinSigns()).containsExactly(SkinSign.ERYTHEMA, SkinSign.EDEMA);
 		assertThat(restored.pendingFields()).containsExactly("symptoms");
 	}
 

@@ -704,7 +704,7 @@ paths:
       description: |
         선택지 버튼으로 고른 답을 보낸다. LLM을 부르지 않고 초안에 바로 반영하며, 다음 질문은 서버의 정해진 문장이다.
         이용 한도(`CHAT_LIMIT_EXCEEDED`)에 세지 않으므로 한도에 도달해도 보낼 수 있다.
-        대화 내역에는 고른 값이 "6점", "7.5시간", "예", "피부건조증, 홍반", "넘어갈게요" 같은 문장으로 남는다.
+        대화 내역에는 고른 값이 "6점", "7.5시간", "예", "홍반, 건조증", "넘어갈게요" 같은 문장으로 남는다.
 
         - 지금 묻는 항목(`askingField`)에만 답할 수 있다. 다른 항목이면 `400 INVALID_INPUT`.
         - `skip: true`는 "넘어갈게요"(특이사항은 "없어요")다. 고통 지수는 건너뛸 수 없다.
@@ -733,7 +733,7 @@ paths:
                     - type: array
                       items:
                         type: string
-                        enum: [XEROSIS, ERYTHEMA, SCALING, PAPULE, EXCORIATION, NODULE, LICHENIFICATION]
+                        enum: [ERYTHEMA, EDEMA, OOZING, EXCORIATION, LICHENIFICATION, XEROSIS, ITCHING]
                 skip:
                   type: boolean
                   default: false
@@ -741,7 +741,7 @@ paths:
               painIndex:
                 value: { field: painIndex, value: 6 }
               skinSigns:
-                value: { field: skinSigns, value: [XEROSIS, ERYTHEMA] }
+                value: { field: skinSigns, value: [ERYTHEMA, XEROSIS] }
               skip:
                 value: { field: sleepHours, skip: true }
       responses:
@@ -1132,7 +1132,7 @@ components:
       properties:
         field:
           type: string
-          example: skinConditions[0].symptoms.itching
+          example: skinConditions[0].symptoms.pain
         reason:
           type: string
           example: 0~10 범위여야 합니다.
@@ -1140,11 +1140,12 @@ components:
     # ── Enum ──
     BodyPart:
       type: string
-      description: 마네킹 부위(FACE~LEFT_LOWER_LEG, 팔·다리는 좌우·상박·하박). CHEST~FOOT는 예전 기록을 읽기 위해 남겨 둔 부위
-      enum: [FACE, NECK, TRUNK, RIGHT_UPPER_ARM, RIGHT_FOREARM, LEFT_UPPER_ARM, LEFT_FOREARM, GROIN, RIGHT_THIGH, RIGHT_LOWER_LEG, LEFT_THIGH, LEFT_LOWER_LEG, CHEST, BACK, ABDOMEN, ARM, HAND, LEG, FOOT]
+      description: 마네킹 부위(FACE~BACK, 팔·다리는 좌우·상박·하박, 손·발은 좌우, 등은 뒷면). CHEST~FOOT는 예전 기록을 읽기 위해 남겨 둔 부위
+      enum: [FACE, NECK, TRUNK, RIGHT_UPPER_ARM, RIGHT_FOREARM, LEFT_UPPER_ARM, LEFT_FOREARM, GROIN, RIGHT_THIGH, RIGHT_LOWER_LEG, LEFT_THIGH, LEFT_LOWER_LEG, RIGHT_HAND, LEFT_HAND, RIGHT_FOOT, LEFT_FOOT, BACK, CHEST, ABDOMEN, ARM, HAND, LEG, FOOT]
     Symptom:
       type: string
-      enum: [itching, stinging, redness, dryness, flaking, swelling, pain]
+      description: 부위 점수 항목. 지금은 부위의 고통 점수(pain) 하나다. 예전 증상별 점수(itching 등)는 나타난 증상(SkinSign)으로 옮겼다.
+      enum: [pain]
     OutdoorActivity:
       type: string
       enum: [LOW, MEDIUM, HIGH]
@@ -1219,41 +1220,15 @@ components:
     # ── 피부 기록 ──
     Symptoms:
       type: object
-      description: 증상별 점수(0~10). 기록하지 않은 증상은 생략한다.
+      description: 부위 점수. 지금은 부위의 고통 점수(pain, 0~10) 하나다.
+      required: [pain]
       properties:
-        itching:
-          type: integer
-          minimum: 0
-          maximum: 10
-        stinging:
-          type: integer
-          minimum: 0
-          maximum: 10
-        redness:
-          type: integer
-          minimum: 0
-          maximum: 10
-        dryness:
-          type: integer
-          minimum: 0
-          maximum: 10
-        flaking:
-          type: integer
-          minimum: 0
-          maximum: 10
-        swelling:
-          type: integer
-          minimum: 0
-          maximum: 10
         pain:
           type: integer
           minimum: 0
           maximum: 10
       example:
-        itching: 4
-        stinging: 2
-        redness: 3
-        dryness: 4
+        pain: 4
     SkinCondition:
       type: object
       required: [bodyPart, symptoms]
@@ -1262,6 +1237,11 @@ components:
           $ref: '#/components/schemas/BodyPart'
         symptoms:
           $ref: '#/components/schemas/Symptoms'
+        skinSigns:
+          type: array
+          description: 이 부위에 나타난 증상. 없으면 생략(응답은 빈 배열). 저장하면 하루의 skinSigns에도 합쳐진다
+          items:
+            $ref: '#/components/schemas/SkinSign'
     Lifestyle:
       type: object
       properties:
@@ -1274,9 +1254,12 @@ components:
           nullable: true
     SkinSign:
       type: string
-      description: 오늘 피부에 나타난 증상. 부위별 증상 점수와 별개로 하루 단위로 기록한다. XEROSIS 피부건조증, ERYTHEMA 홍반, SCALING 각질, PAPULE 구진, EXCORIATION 긁은 자국, NODULE 결절, LICHENIFICATION 태선화
-      enum: [XEROSIS, ERYTHEMA, SCALING, PAPULE, EXCORIATION, NODULE, LICHENIFICATION]
-      example: XEROSIS
+      description: |
+        피부에 나타난 증상(있음/없음). 부위마다, 그리고 하루 단위로 기록한다. 응답은 아래 순서로 정렬된다.
+        ERYTHEMA 홍반, EDEMA 부종/구진(결절), OOZING 진물/딱지, EXCORIATION 긁은 자국(찰상), LICHENIFICATION 태선화, XEROSIS 건조증, ITCHING 가려움.
+        예전 값은 서버가 뜰 때 옮긴다: PAPULE·NODULE → EDEMA, SCALING은 지움.
+      enum: [ERYTHEMA, EDEMA, OOZING, EXCORIATION, LICHENIFICATION, XEROSIS, ITCHING]
+      example: ERYTHEMA
     RecordRequest:
       type: object
       description: 부위별 증상(skinConditions)과 고통 지수(painIndex) 중 하나 이상은 있어야 한다.
@@ -1467,7 +1450,7 @@ components:
                 example: SYMPTOM_CHANGE
               message:
                 type: string
-                example: 팔 가려움 점수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)
+                example: 팔 고통 점수가 평소(평균 3.8)보다 높게 기록된 구간이 있습니다. (3/7~3/8)
               bodyPart:
                 nullable: true
                 allOf:
@@ -1573,7 +1556,7 @@ components:
       properties:
         reply:
           type: string
-          example: 오늘 팔의 가려움 점수와 수면 시간을 기록할게요. 가려움은 어느 정도였나요?
+          example: 어젯밤 몇 시간 주무셨나요?
         understood:
           type: boolean
           description: 입력한 문장을 해석했는지. false이면 같은 내용을 다시 물어보는 응답이다.
@@ -1581,7 +1564,7 @@ components:
         pendingFields:
           type: array
           description: |
-            아직 입력되지 않은 항목. 필수 항목이 먼저 온다. 증상 이름(itching 등)이 아니라 다음 값 중 일부다.
+            아직 입력되지 않은 항목. 필수 항목이 먼저 온다. 증상 이름이 아니라 다음 값 중 일부다.
             painIndex(고통 지수, 필수), symptoms(증상 점수. 부위를 말했지만 점수가 아직 없을 때),
             sleepHours(수면), medication(약 복용), skinSigns(나타난 증상), notes(특이사항)
           items:
@@ -1760,7 +1743,7 @@ components:
             painIndex: 6
             sleepHours: 6
             medication: true
-            skinSigns: [XEROSIS, EXCORIATION]
+            skinSigns: [EXCORIATION, XEROSIS]
             notes: 오늘 팔이 많이 가려웠음
 
     # ── 보고서 ──

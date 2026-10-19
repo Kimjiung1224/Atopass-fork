@@ -58,6 +58,8 @@ export function useChatSession(recordDate: string) {
   const [pendingFields, setPendingFields] = useState<PendingField[]>([]);
   const [askingField, setAskingField] = useState<PendingField | null>(null);
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
+  // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
+  const [painIndex, setPainIndex] = useState<number | null>(null);
   const [status, setStatus] = useState<ChatStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   // 한도에 도달해도 대화 내역·초안 조회는 되므로 status는 그대로 두고 안내만 띄운다
@@ -86,6 +88,7 @@ export function useChatSession(recordDate: string) {
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
+          setPainIndex(state.draft.painIndex ?? null);
           setStatus('ready');
           return;
         } catch (e) {
@@ -107,6 +110,7 @@ export function useChatSession(recordDate: string) {
       setPendingFields([]);
       setAskingField('painIndex');
       setRequiresConfirmation(false);
+      setPainIndex(null);
       setStatus('ready');
     } catch (e) {
       if (isApiError(e, 'CONSENT_REQUIRED')) {
@@ -154,6 +158,7 @@ export function useChatSession(recordDate: string) {
         setPendingFields(res.pendingFields);
         setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
+        setPainIndex(res.draft?.painIndex ?? null);
         setStatus('ready');
         setLimitReached(false);
         return { ok: true };
@@ -202,6 +207,7 @@ export function useChatSession(recordDate: string) {
           setPendingFields(state.pendingFields);
           setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
+          setPainIndex(state.draft.painIndex ?? null);
         } catch {
           // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
         }
@@ -219,6 +225,7 @@ export function useChatSession(recordDate: string) {
     pendingFields,
     askingField,
     requiresConfirmation,
+    painIndex,
     status,
     error,
     limitReached,

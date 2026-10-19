@@ -66,7 +66,7 @@ public class RecordService {
 			.outdoorActivity(lifestyle == null ? null : lifestyle.outdoorActivity())
 			.notes(blankToNull(request.notes()))
 			.build();
-		record.replaceConditions(toConditions(request));
+		record.replaceConditions(toConditions(request), toConditionSigns(request));
 		record.replaceSkinSigns(toSkinSigns(request));
 		try {
 			return RecordCreatedResponse.from(recordRepository.saveAndFlush(record));
@@ -110,7 +110,7 @@ public class RecordService {
 			lifestyle == null ? null : lifestyle.alcohol(),
 			lifestyle == null ? null : lifestyle.outdoorActivity(),
 			blankToNull(request.notes()));
-		record.replaceConditions(toConditions(request));
+		record.replaceConditions(toConditions(request), toConditionSigns(request));
 		record.replaceSkinSigns(toSkinSigns(request));
 		try {
 			recordRepository.flush();
@@ -144,11 +144,28 @@ public class RecordService {
 		return conditions;
 	}
 
+	private Map<BodyPart, Set<SkinSign>> toConditionSigns(RecordRequest request) {
+		Map<BodyPart, Set<SkinSign>> signs = new EnumMap<>(BodyPart.class);
+		if (request.skinConditions() == null) {
+			return signs;
+		}
+		for (SkinConditionRequest condition : request.skinConditions()) {
+			Set<SkinSign> partSigns = EnumSet.noneOf(SkinSign.class);
+			if (condition.skinSigns() != null) {
+				partSigns.addAll(condition.skinSigns());
+			}
+			signs.put(condition.bodyPart(), partSigns);
+		}
+		return signs;
+	}
+
+	/** 하루의 나타난 증상 = 직접 고른 증상 + 부위마다 고른 증상 */
 	private Set<SkinSign> toSkinSigns(RecordRequest request) {
 		Set<SkinSign> signs = EnumSet.noneOf(SkinSign.class);
 		if (request.skinSigns() != null) {
 			signs.addAll(request.skinSigns());
 		}
+		toConditionSigns(request).values().forEach(signs::addAll);
 		return signs;
 	}
 

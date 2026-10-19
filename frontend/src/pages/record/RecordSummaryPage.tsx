@@ -155,6 +155,7 @@ function RecordSummary({ date }: { date: string }) {
           painIndex={form.painIndex}
           medication={form.medication}
           skinSigns={form.skinSigns}
+          skinConditions={form.skinConditions}
           onChange={(next) => setForm({ ...form, ...next })}
         />
         <FieldError errors={fieldErrors} prefix="painIndex" />
@@ -162,7 +163,7 @@ function RecordSummary({ date }: { date: string }) {
         <FieldError errors={fieldErrors} prefix="skinSigns" />
       </Section>
 
-      <Section title="부위별 고통 점수">
+      <Section title="부위별 고통 점수·증상">
         <SkinConditionEditor
           value={form.skinConditions}
           onChange={(skinConditions) => setForm({ ...form, skinConditions })}
@@ -260,7 +261,7 @@ function RecordSummary({ date }: { date: string }) {
   );
 }
 
-/** 서버 검증 오류(error.details) 표시 — field가 "skinConditions[0].symptoms.itching"처럼 와서 앞부분으로 찾는다 */
+/** 서버 검증 오류(error.details) 표시 — field가 "skinConditions[0].symptoms.pain"처럼 와서 앞부분으로 찾는다 */
 function FieldError({ errors, prefix }: { errors: Record<string, string>; prefix: string }) {
   const reason = Object.entries(errors).find(([field]) => field.startsWith(prefix))?.[1];
   return reason ? <p className="mt-2 text-sm text-red-500">{reason}</p> : null;
