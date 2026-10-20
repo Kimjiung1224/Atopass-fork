@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { authApi } from '@/apis/auth';
+import { Link } from 'react-router';
 import { memberApi } from '@/apis/member';
 import { getAllRecords } from '@/apis/recordList';
+import AccountMenu from '@/components/common/AccountMenu';
 import Disclaimer from '@/components/common/Disclaimer';
 import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
@@ -20,7 +20,6 @@ const CHART_DAYS = 7;
 const RECENT_RECORDS_COUNT = 3;
 
 export default function HomePage() {
-  const navigate = useNavigate();
   const todayString = today();
   const range = useMemo(() => lastNDaysRange(CHART_DAYS), []);
 
@@ -47,21 +46,9 @@ export default function HomePage() {
     [records.data],
   );
 
-  const handleLogout = async () => {
-    await authApi.logout().catch(() => undefined);
-    navigate('/login', { replace: true });
-  };
-
   return (
     <>
-      <PageHeader
-        title="Atopass"
-        right={
-          <button type="button" onClick={handleLogout} className="rounded-lg px-2 py-1 text-sm text-gray-400">
-            로그아웃
-          </button>
-        }
-      />
+      <PageHeader title="Atopass" right={<AccountMenu />} />
 
       <div className="flex flex-col gap-4 px-5 pt-5">
         <section>
