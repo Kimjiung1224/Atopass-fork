@@ -91,6 +91,17 @@ export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   ITCHING: '가려움',
 };
 
+/** 증상을 쉬운 말로 풀어 쓴 설명. 증상을 고르는 버튼 아래에 작게 보여 준다 (서버 SkinSign의 설명과 같다) */
+export const SKIN_SIGN_DESCRIPTIONS: Record<SkinSign, string> = {
+  ERYTHEMA: '피부가 붉어짐',
+  EDEMA: '피부가 붓거나 오돌토돌 솟아오름, 단단한 멍울',
+  OOZING: '상처에서 진물이 나오거나 딱지가 앉음',
+  EXCORIATION: '긁어서 피부가 까지거나 긁힌 자국이 남음',
+  LICHENIFICATION: '오래 긁어서 피부가 두꺼워지고 거칠어짐, 주름이 깊어짐',
+  XEROSIS: '피부가 건조하고 당기거나 하얗게 일어남',
+  ITCHING: '피부가 가려움',
+};
+
 /** 수면 점수: 7~8시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */
 export const SLEEP_SCORE_MAX = 5;
 
