@@ -80,17 +80,6 @@ export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
-/**
- * 겹쳐보기 그래프의 지표별 고정 색. 순서가 CVD 안전성 근거이므로 항상 같은 순서(슬롯)를 쓴다 —
- * 어떤 지표를 켜고 끄든 같은 지표는 항상 같은 색을 유지한다(선택 순서로 재배정하지 않음).
- */
-export const OVERLAY_SERIES_COLORS = {
-  score: '#2a78d6',
-  sleep: '#eb6834',
-  temperature: '#1baf7a',
-  humidity: '#eda100',
-} as const;
-
 /** 나타난 증상 7가지 — 이 순서로 보여 준다 (1 홍반 … 7 가려움). 서버 SkinSign 선언 순서와 같다 */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   ERYTHEMA: '홍반',

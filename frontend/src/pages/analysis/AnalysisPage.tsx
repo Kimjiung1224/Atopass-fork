@@ -2,10 +2,9 @@ import { useMemo, useState } from 'react';
 import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
 import { getHistoricalWeather } from '@/apis/weather';
-import OverlayTrendChart, { type OverlaySeries } from '@/components/analysis/OverlayTrendChart';
+import OverlayTrendChart, { type AuxKey } from '@/components/analysis/OverlayTrendChart';
 import PeriodInsights from '@/components/analysis/PeriodInsights';
 import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
-import SleepBarChart from '@/components/analysis/SleepBarChart';
 import TrendLineChart, { type TrendDatum } from '@/components/analysis/TrendLineChart';
 import { SCORE_TICKS } from '@/components/analysis/chartTheme';
 import PageHeader from '@/components/common/PageHeader';
@@ -18,7 +17,6 @@ import {
   HUMIDITY_MAX,
   HUMIDITY_MIN,
   HUMIDITY_TICKS,
-  OVERLAY_SERIES_COLORS,
   SCORE_MAX,
   SCORE_MIN,
   TEMPERATURE_MAX,
@@ -31,15 +29,7 @@ import { getErrorMessage } from '@/utils/errorMessage';
 import { bodyPartScoreOf } from '@/utils/recordScore';
 
 type Period = '30' | '90' | 'ALL';
-type Tab = 'overall' | 'bodyPart' | 'sleep' | 'weather' | 'overlay';
-type OverlayKey = 'score' | 'sleep' | 'temperature' | 'humidity';
-
-const OVERLAY_METRICS: { key: OverlayKey; label: string }[] = [
-  { key: 'score', label: '고통 지수' },
-  { key: 'sleep', label: '수면 시간' },
-  { key: 'temperature', label: '기온' },
-  { key: 'humidity', label: '습도' },
-];
+type Tab = 'overlay' | 'bodyPart' | 'weather';
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: '30', label: '30일' },
@@ -49,9 +39,7 @@ const PERIODS: { value: Period; label: string }[] = [
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'overlay', label: '전체' },
-  { value: 'overall', label: '고통 지수' },
   { value: 'bodyPart', label: '부위별' },
-  { value: 'sleep', label: '수면·생활' },
   { value: 'weather', label: '날씨' },
 ];
 
@@ -80,10 +68,10 @@ function toDailySeries(items: TrendDatum[], startDate: string, endDate: string, 
 
 export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
-  const [tab, setTab] = useState<Tab>('overall');
+  const [tab, setTab] = useState<Tab>('overlay');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
-  // 겹쳐보기에서 켠 지표. 기본은 전부 켠 상태로 시작한다.
-  const [overlayKeys, setOverlayKeys] = useState<Set<OverlayKey>>(() => new Set(OVERLAY_METRICS.map((m) => m.key)));
+  // '전체' 탭에서 고통 지수 위에 겹쳐 볼 보조 지표. 기본은 수면 시간·기온만 켠다.
+  const [overlayKeys, setOverlayKeys] = useState<Set<AuxKey>>(() => new Set<AuxKey>(['sleep', 'temperature']));
   // 그래프에서 누른 날. 화면을 옮기지 않고 그래프 아래에 그날 기록을 보여 준다.
   const [selected, setSelected] = useState<{ date: string; recordId: number } | null>(null);
 
@@ -93,7 +81,7 @@ export default function AnalysisPage() {
   const isWeatherTab = tab === 'weather';
   const isOverlayTab = tab === 'overlay';
 
-  // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 부위의 증상 평균을 쓴다.
+  // /analysis/trends는 증상 하나씩만 주므로(명세 4-2) 기록 목록을 가공한다. 부위별 탭은 그 부위의 고통 점수를 쓴다.
   const records = useAsync(() => getAllRecords(range.startDate, range.endDate), [range]);
   // 분석 요약: 그래프를 위로 올리고, 기록 부족 안내는 그래프 아래에, 인사이트는 접어서 그 아래에 둔다.
   const summary = useAsync(() => analysisApi.getSummary(range), [range]);
@@ -101,16 +89,11 @@ export default function AnalysisPage() {
   const series = useMemo(() => {
     const items = (records.data ?? []).map((r) => ({
       date: r.recordDate,
-      value:
-        tab === 'sleep'
-          ? (r.sleepHours ?? null)
-          : isBodyPartTab
-            ? bodyPartScoreOf(r.skinConditions, bodyPart)
-            : (r.painIndex ?? null),
+      value: bodyPartScoreOf(r.skinConditions, bodyPart),
       recordId: r.recordId,
     }));
     return toDailySeries(items, range.startDate, range.endDate, isAll);
-  }, [isBodyPartTab, tab, bodyPart, records.data, range, isAll]);
+  }, [bodyPart, records.data, range, isAll]);
 
   const hasValue = series.some((d) => d.value !== null);
 
@@ -136,8 +119,8 @@ export default function AnalysisPage() {
   );
   const hasWeather = temperatureSeries.some((d) => d.value !== null) || humiditySeries.some((d) => d.value !== null);
 
-  // 겹쳐보기용: 탭과 무관하게 고통 지수·수면 시간을 뽑는다(날씨와 같은 날짜 범위를 써서 날짜가 맞물리게 한다).
-  // '전체' 탭과 같은 기준(painIndex)을 쓴다. weatherRange가 null이면(전체 기간인데 기록이 없음) 앵커가 없는 것이므로 계산하지 않는다.
+  // '전체' 탭용 고통 지수·수면 시간(날씨와 같은 날짜 범위를 써서 날짜가 맞물리게 한다).
+  // weatherRange가 null이면(전체 기간인데 기록이 없음) 앵커가 없는 것이므로 계산하지 않는다.
   const overlayScoreSeries = useMemo(() => {
     if (!weatherRange) return [];
     const items = (records.data ?? []).map((r) => ({
@@ -153,38 +136,7 @@ export default function AnalysisPage() {
     return toDailySeries(items, weatherRange.startDate, weatherRange.endDate, false);
   }, [records.data, weatherRange]);
 
-  const overlayAllSeries: Record<OverlayKey, OverlaySeries> = {
-    score: {
-      key: 'score',
-      label: '고통 지수',
-      color: OVERLAY_SERIES_COLORS.score,
-      data: overlayScoreSeries,
-      formatValue: (v) => `${v}점`,
-    },
-    sleep: {
-      key: 'sleep',
-      label: '수면 시간',
-      color: OVERLAY_SERIES_COLORS.sleep,
-      data: overlaySleepSeries,
-      formatValue: (v) => `${v}시간`,
-    },
-    temperature: {
-      key: 'temperature',
-      label: '기온',
-      color: OVERLAY_SERIES_COLORS.temperature,
-      data: temperatureSeries,
-      formatValue: (v) => `${v}°C`,
-    },
-    humidity: {
-      key: 'humidity',
-      label: '습도',
-      color: OVERLAY_SERIES_COLORS.humidity,
-      data: humiditySeries,
-      formatValue: (v) => `${v}%`,
-    },
-  };
-  const overlaySelectedSeries = OVERLAY_METRICS.filter((m) => overlayKeys.has(m.key)).map((m) => overlayAllSeries[m.key]);
-  const toggleOverlayKey = (key: OverlayKey) => {
+  const toggleOverlayKey = (key: AuxKey) => {
     setOverlayKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -233,17 +185,10 @@ export default function AnalysisPage() {
               <p className="text-sm text-gray-400">그 부위에 기록한 고통 점수예요.</p>
             </div>
           )}
-          {tab === 'overall' && <p className="-mt-1 mb-3 text-sm text-gray-400">그날 기록한 고통 지수예요.</p>}
           {isWeatherTab && (
             <p className="-mt-1 mb-3 text-sm text-gray-400">
               하루 평균 기온·습도예요.{weather.data?.locationLabel && ` (${weather.data.locationLabel} 기준)`}
             </p>
-          )}
-          {isOverlayTab && (
-            <div className="mb-3 flex flex-col gap-2">
-              <ToggleChipGroup label="지표" options={OVERLAY_METRICS} selected={overlayKeys} onToggle={toggleOverlayKey} colors={OVERLAY_SERIES_COLORS} />
-              <p className="text-sm text-gray-400">단위가 달라 실제 값 대신 기간 내 상대값(0~100%)으로 겹쳐요. 실제 값은 툴팁에서 볼 수 있어요.</p>
-            </div>
           )}
 
           {isOverlayTab ? (
@@ -255,10 +200,14 @@ export default function AnalysisPage() {
               <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
             ) : !weatherRange ? (
               <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
-            ) : overlaySelectedSeries.length === 0 ? (
-              <p className="py-12 text-center text-gray-400">겹쳐 볼 지표를 선택해 주세요.</p>
             ) : (
-              <OverlayTrendChart series={overlaySelectedSeries} ariaLabel="선택한 지표를 겹친 변화 그래프" />
+              <OverlayTrendChart
+                key={period}
+                pain={overlayScoreSeries}
+                aux={{ sleep: overlaySleepSeries, temperature: temperatureSeries, humidity: humiditySeries }}
+                enabled={overlayKeys}
+                onToggle={toggleOverlayKey}
+              />
             )
           ) : isWeatherTab ? (
             weather.loading ? (
@@ -299,16 +248,14 @@ export default function AnalysisPage() {
             <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
           ) : !hasValue ? (
             <p className="py-12 text-center text-gray-400">이 기간에 기록이 없어요.</p>
-          ) : tab === 'sleep' ? (
-            <SleepBarChart data={series} onBarClick={selectDay} />
           ) : (
             <TrendLineChart
               data={series}
               domain={[SCORE_MIN, SCORE_MAX]}
               ticks={SCORE_TICKS}
-              formatValue={(v) => (tab === 'overall' ? `고통 지수 ${v}점` : `${BODY_PART_LABELS[bodyPart]} 고통 점수 ${v}점`)}
+              formatValue={(v) => `${BODY_PART_LABELS[bodyPart]} 고통 점수 ${v}점`}
               onPointClick={selectDay}
-              ariaLabel={tab === 'overall' ? '고통 지수 변화 그래프' : '부위별 고통 점수 변화 그래프'}
+              ariaLabel="부위별 고통 점수 변화 그래프"
             />
           )}
 
@@ -366,49 +313,6 @@ function SegmentedControl<T extends string>({
           {option.label}
         </button>
       ))}
-    </div>
-  );
-}
-
-function ToggleChipGroup<T extends string>({
-  label,
-  options,
-  selected,
-  onToggle,
-  colors,
-}: {
-  label: string;
-  options: { key: T; label: string }[];
-  selected: Set<T>;
-  onToggle: (key: T) => void;
-  colors: Record<T, string>;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-9 shrink-0 text-sm font-medium text-gray-500">{label}</span>
-      <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
-        {options.map((option) => {
-          const isOn = selected.has(option.key);
-          return (
-            <button
-              key={option.key}
-              type="button"
-              aria-pressed={isOn}
-              onClick={() => onToggle(option.key)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${
-                isOn ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              <span
-                aria-hidden="true"
-                className="inline-block h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: colors[option.key], opacity: isOn ? 1 : 0.4 }}
-              />
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
