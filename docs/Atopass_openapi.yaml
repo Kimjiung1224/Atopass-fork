@@ -771,6 +771,57 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /chatbot/sessions/{sessionId}/values:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    post:
+      tags: [Chatbot]
+      summary: 기록 화면 막대로 고친 값
+      description: |
+        챗봇 화면 뒤의 기록 화면에서 고통 지수·수면 시간 막대로 직접 고친 값을 보낸다.
+        `/choices`와 달리 지금 묻는 항목(`askingField`)이 아니어도 언제든 반영한다. LLM을 부르지 않으며 이용 한도에 세지 않는다.
+        대화 내역에는 "고통 지수를 6점으로 할게요", "수면 시간을 8시간으로 할게요"처럼 남는다.
+
+        - 지금 묻던 항목이면 그 질문에 답한 것으로 보고 다음 질문으로 넘어간다. 아니면 지금 묻던 질문을 다시 묻는다.
+        - 그날 기록이 이미 저장되어 있으면 바로 다시 저장하고, 응답의 `reply`에 바뀐 기록을 보여 준다.
+        - `field`는 `painIndex`(0~10 정수), `sleepHours`(0~24, 소수점 한 자리)만 된다. 그 밖이거나 범위를 벗어나면 `400 INVALID_INPUT`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [field, value]
+              properties:
+                field:
+                  type: string
+                  enum: [painIndex, sleepHours]
+                value:
+                  type: number
+            examples:
+              sleepHours:
+                value: { field: sleepHours, value: 8 }
+      responses:
+        '200':
+          description: 챗봇 응답 (메시지 전송과 같은 형식)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessBase'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChatReply'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ConsentRequired'
+        '404':
+          $ref: '#/components/responses/SessionNotFound'
+
   /chatbot/sessions/{sessionId}/finish:
     parameters:
       - $ref: '#/components/parameters/SessionId'

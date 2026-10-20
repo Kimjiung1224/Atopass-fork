@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { chatbotApi } from '@/apis/chatbot';
 import { ApiError } from '@/apis/client';
 import { photoApi } from '@/apis/photo';
-import type { ChatChoiceRequest, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
+import type { ChatChoiceRequest, ChatDraft, ChatMessage, PendingField, SendMessageResponse } from '@/types/chatbot';
 import { BODY_MAP_PARTS, BODY_PART_LABELS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import { chatSessionStore } from './useRecordDraft';
 
@@ -66,6 +66,8 @@ export function useChatSession(recordDate: string) {
   const [requiresConfirmation, setRequiresConfirmation] = useState(false);
   // 그날 기록이 저장되었으면 그 ID. 사진을 바로 올릴 때 쓴다
   const [recordId, setRecordId] = useState<number | null>(null);
+  // 지금까지 모은 기록. 챗봇 뒤의 기록 화면에 보여 준다
+  const [draft, setDraft] = useState<ChatDraft | null>(null);
   // 챗봇 캐릭터 표정에 쓴다. 아직 말하지 않았으면 null
   const [painIndex, setPainIndex] = useState<number | null>(null);
   const [status, setStatus] = useState<ChatStatus>('loading');
@@ -92,6 +94,7 @@ export function useChatSession(recordDate: string) {
       setAskingField(state.askingField);
       setRequiresConfirmation(state.requiresConfirmation);
       setRecordId(state.recordId);
+      setDraft(state.draft);
       setPainIndex(state.draft.painIndex ?? null);
       setStatus('ready');
     },
@@ -156,6 +159,7 @@ export function useChatSession(recordDate: string) {
         setAskingField(res.askingField);
         setRequiresConfirmation(res.requiresConfirmation);
         setRecordId(res.recordId);
+        setDraft(res.draft);
         setPainIndex(res.draft?.painIndex ?? null);
         setStatus('ready');
         setLimitReached(false);
@@ -194,6 +198,16 @@ export function useChatSession(recordDate: string) {
     [runTurn],
   );
 
+  /** 기록 화면의 막대로 고친 값 — 대화에도 남겨 채팅과 같은 값을 보게 한다. LLM을 거치지 않는다 */
+  const adjust = useCallback(
+    (field: 'painIndex' | 'sleepHours', value: number) =>
+      runTurn(
+        field === 'painIndex' ? `고통 지수를 ${value}점으로 할게요` : `수면 시간을 ${value}시간으로 할게요`,
+        (id) => chatbotApi.adjustValue(id, { field, value }),
+      ),
+    [runTurn],
+  );
+
   /** 선택지 답 — LLM을 거치지 않으므로 이용 한도와 상관없이 보낼 수 있다 */
   const choose = useCallback(
     async (choice: ChatChoiceRequest) => {
@@ -206,6 +220,7 @@ export function useChatSession(recordDate: string) {
           setAskingField(state.askingField);
           setRequiresConfirmation(state.requiresConfirmation);
           setRecordId(state.recordId);
+          setDraft(state.draft);
           setPainIndex(state.draft.painIndex ?? null);
         } catch {
           // 다시 맞추지 못해도 오류 문구는 이미 보여 주고 있다
@@ -256,6 +271,8 @@ export function useChatSession(recordDate: string) {
     send,
     choose,
     recordId,
+    draft,
+    adjust,
     uploadPhotos,
     agree,
     retry: start,

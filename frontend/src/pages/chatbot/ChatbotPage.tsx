@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
+import ChatBottomSheet from '@/components/chatbot/ChatBottomSheet';
 import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
 import PendingFieldList from '@/components/chatbot/PendingFieldList';
+import TodayRecordPanel, { type AdjustableField } from '@/components/chatbot/TodayRecordPanel';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
@@ -15,7 +17,10 @@ import { formatKoreanDate, today } from '@/utils/date';
 import { validatePhotos } from '@/utils/photo';
 import { recordPath } from '@/utils/routes';
 
-/** 기록 (챗봇) — /chatbot. 대화형으로 오늘의 피부 기록을 입력한다 */
+/**
+ * 기록 (챗봇) — /chatbot. 오늘의 기록 화면을 바탕에 두고, 채팅은 아래에서 끌어올리는 패널(바텀시트)로 띄운다.
+ * 올리면 채팅을 크게 보고, 내리면 기록 화면에서 고통 지수·수면 시간 막대를 바로 밀어 고칠 수 있다.
+ */
 export default function ChatbotPage() {
   const navigate = useNavigate();
   const recordDate = today();
@@ -31,13 +36,16 @@ export default function ChatbotPage() {
     send,
     choose,
     recordId,
+    draft,
+    adjust,
     uploadPhotos,
     agree,
     retry,
   } = useChatSession(recordDate);
-  const draft = useRecordDraft(recordDate);
+  const photoDraft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
 
   const goToSummary = () => navigate(recordPath(recordDate));
 
@@ -51,13 +59,18 @@ export default function ChatbotPage() {
   // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목을 숨긴다
   const pickingParts = choiceField === 'bodyParts';
 
+  // 마네킹·증상처럼 큰 선택지는 접힌 패널에 다 들어가지 않으므로 패널을 펼친다
+  useEffect(() => {
+    if (choiceField === 'bodyParts' || choiceField === 'skinSigns') setSheetExpanded(true);
+  }, [choiceField]);
+
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
-  const pendingPhotos = draft.photos;
+  const pendingPhotos = photoDraft.photos;
   useEffect(() => {
     if (!recordId || pendingPhotos.length === 0) return;
-    draft.clearPhotos();
+    photoDraft.clearPhotos();
     void uploadPhotos(pendingPhotos).then((failed) => {
-      if (failed.length) draft.addPhotos(failed);
+      if (failed.length) photoDraft.addPhotos(failed);
     });
   }, [recordId, pendingPhotos]);
 
@@ -75,10 +88,15 @@ export default function ChatbotPage() {
     if (result.closed) void retry();
   };
 
+  const handleAdjust = async (field: AdjustableField, value: number) => {
+    const result = await adjust(field, value);
+    if (result.closed) void retry();
+  };
+
   const handleAttach = (files: File[]) => {
-    const message = validatePhotos(files, draft.photos.length);
+    const message = validatePhotos(files, photoDraft.photos.length);
     setPhotoError(message);
-    if (!message) draft.addPhotos(files);
+    if (!message) photoDraft.addPhotos(files);
   };
 
   return (
@@ -88,62 +106,69 @@ export default function ChatbotPage() {
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}
       />
 
-      {/* 아래 선택지 칸이 길어도 대화가 가려지지 않도록 최소 높이를 둔다 */}
-      <div className="min-h-32 flex-1 overflow-y-auto">
-        {status === 'loading' && <p className="p-6 text-center text-gray-500">대화를 준비하고 있어요…</p>}
-        {status === 'error' ? (
-          <div className="p-6 text-center">
-            <p className="mb-3 text-gray-700">{error}</p>
-            <button type="button" onClick={() => void retry()} className="rounded-lg border px-4 py-2">
-              다시 시도
-            </button>
+      <div className="relative min-h-0 flex-1">
+        {/* 바탕: 오늘의 기록. 접힌 채팅 패널에 가리지 않도록 아래 여백을 둔다 */}
+        <div className="h-full overflow-y-auto">
+          <TodayRecordPanel draft={draft} disabled={status !== 'ready'} onAdjust={(f, v) => void handleAdjust(f, v)} />
+          <div className="h-[45%]" aria-hidden />
+        </div>
+
+        <ChatBottomSheet expanded={sheetExpanded} onExpandedChange={setSheetExpanded}>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {status === 'loading' && <p className="p-6 text-center text-gray-500">대화를 준비하고 있어요…</p>}
+            {status === 'error' ? (
+              <div className="p-6 text-center">
+                <p className="mb-3 text-gray-700">{error}</p>
+                <button type="button" onClick={() => void retry()} className="rounded-lg border px-4 py-2">
+                  다시 시도
+                </button>
+              </div>
+            ) : (
+              <ChatMessageList
+                messages={messages}
+                typing={status === 'sending'}
+                mood={atomiMood(painIndex, requiresConfirmation)}
+              />
+            )}
           </div>
-        ) : (
-          <ChatMessageList
-            messages={messages}
-            typing={status === 'sending'}
-            mood={atomiMood(painIndex, requiresConfirmation)}
+
+          {sheetExpanded && !requiresConfirmation && !pickingParts && <PendingFieldList fields={pendingFields} />}
+
+          {choiceField && (status === 'ready' || status === 'sending') && (
+            <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
+          )}
+
+          {(photoDraft.photos.length > 0 || photoError) && (
+            <div className="border-t border-gray-100 px-3 pt-3">
+              <PendingPhotoList files={photoDraft.photos} onRemove={photoDraft.removePhoto} />
+              {photoError && <p className="mt-2 text-sm text-red-500">{photoError}</p>}
+            </div>
+          )}
+
+          {limitReached && (
+            <div role="alert" className="border-t border-amber-100 bg-amber-50 p-3">
+              <p className="text-center text-base text-gray-700">
+                오늘 챗봇 이용 한도에 도달했어요. 글로 답하는 것은 잠시 뒤에 다시 해 주세요. 선택지 버튼은 계속 쓸 수 있어요
+              </p>
+            </div>
+          )}
+
+          {(status === 'ready' || status === 'sending') && error && (
+            <p role="alert" className="px-4 pt-2 text-sm text-red-500">
+              {error}
+            </p>
+          )}
+
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            onAttachPhotos={handleAttach}
+            disabled={status !== 'ready'}
+            textLocked={textLocked}
           />
-        )}
+        </ChatBottomSheet>
       </div>
-
-      {!requiresConfirmation && !pickingParts && <PendingFieldList fields={pendingFields} />}
-
-
-      {choiceField && (status === 'ready' || status === 'sending') && (
-        <ChatChoices field={choiceField} onChoose={(c) => void handleChoose(c)} disabled={status !== 'ready'} />
-      )}
-
-
-      {(draft.photos.length > 0 || photoError) && (
-        <div className="border-t border-gray-100 px-3 pt-3">
-          <PendingPhotoList files={draft.photos} onRemove={draft.removePhoto} />
-          {photoError && <p className="mt-2 text-sm text-red-500">{photoError}</p>}
-        </div>
-      )}
-
-      {limitReached && (
-        <div role="alert" className="border-t border-amber-100 bg-amber-50 p-3">
-          <p className="text-center text-base text-gray-700">
-            오늘 챗봇 이용 한도에 도달했어요. 글로 답하는 것은 잠시 뒤에 다시 해 주세요. 선택지 버튼은 계속 쓸 수 있어요
-          </p>
-        </div>
-      )}
-
-      {(status === 'ready' || status === 'sending') && error && (
-        <p role="alert" className="px-4 pt-2 text-sm text-red-500">
-          {error}
-        </p>
-      )}
-
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSubmit}
-        onAttachPhotos={handleAttach}
-        disabled={status !== 'ready'}
-        textLocked={textLocked}
-      />
 
       {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}
     </div>

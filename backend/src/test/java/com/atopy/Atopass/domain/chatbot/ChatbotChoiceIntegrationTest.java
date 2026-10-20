@@ -141,6 +141,46 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
+	void 기록_화면_막대로_고친_값은_묻는_중이_아니어도_반영하고_대화에_남긴다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+
+		// 고통 지수를 묻는 중에 수면 시간을 먼저 고쳐도 반영하고, 계속 고통 지수를 묻는다.
+		mockMvc.perform(value(bearer, session, "sleepHours", 8))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
+			.andExpect(jsonPath("$.data.reply").value(PAIN_QUESTION));
+		// 묻던 항목을 막대로 고치면 그 질문에 답한 것으로 보고 넘어간다.
+		mockMvc.perform(value(bearer, session, "painIndex", 0))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(0))
+			.andExpect(jsonPath("$.data.askingField").value("medication"));
+		mockMvc.perform(get(url(session, "messages")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages[0].content").value("수면 시간을 8시간으로 할게요"))
+			.andExpect(jsonPath("$.data.messages[2].content").value("고통 지수를 0점으로 할게요"));
+		assertThat(llm.callCount()).isZero();
+
+		// 막대로는 고통 지수·수면 시간만 고칠 수 있고, 범위를 벗어나면 400이다.
+		mockMvc.perform(value(bearer, session, "medication", true)).andExpect(status().isBadRequest());
+		mockMvc.perform(value(bearer, session, "painIndex", 11)).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 기록이_저장된_뒤_막대로_고치면_바로_다시_저장한다() throws Exception {
+		String bearer = newMemberBearer();
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(choice(bearer, session, "painIndex", 0));
+		mockMvc.perform(post(url(session, "finish")).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.recordId").isNumber());
+
+		mockMvc.perform(value(bearer, session, "sleepHours", 6))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.startsWith("바로 반영해서 저장했어요.")));
+		mockMvc.perform(get("/api/v1/records").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.content[0].sleepHours").value(6.0));
+	}
+
+	@Test
 	void 값이_규칙에_어긋나면_400이고_초안은_그대로다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
@@ -300,6 +340,13 @@ class ChatbotChoiceIntegrationTest extends ApiTestSupport {
 
 	private MockHttpServletRequestBuilder choice(String bearer, String session, String field, Object value) {
 		return withJson(post(url(session, "choices")).header(AUTH, bearer), Map.of("field", field, "value", value));
+	}
+
+	private MockHttpServletRequestBuilder value(String bearer, String session, String field, Object value) {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("field", field);
+		body.put("value", value);
+		return withJson(post(url(session, "values")).header(AUTH, bearer), body);
 	}
 
 	private MockHttpServletRequestBuilder skip(String bearer, String session, String field) {

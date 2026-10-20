@@ -52,6 +52,17 @@ public class ChatbotController {
 		return ApiResponse.ok(chatbotService.answerChoice(memberId, sessionId, request));
 	}
 
+	/**
+	 * 기록 화면의 고통 지수·수면 시간 막대로 직접 고친 값. 지금 묻는 항목이 아니어도 언제든 반영한다.
+	 * LLM을 부르지 않으므로 이용 한도에 세지 않는다.
+	 */
+	@PostMapping("/{sessionId}/values")
+	public ApiResponse<ChatReplyResponse> adjustValue(
+		@CurrentMember Long memberId, @PathVariable String sessionId,
+		@Valid @RequestBody ChatChoiceRequest request) {
+		return ApiResponse.ok(chatbotService.adjustValue(memberId, sessionId, request));
+	}
+
 	/** "기록 마치기" 버튼. 필수 항목이 채워졌으면 확인 단계로 넘어간다. */
 	@PostMapping("/{sessionId}/finish")
 	public ApiResponse<ChatReplyResponse> finish(@CurrentMember Long memberId, @PathVariable String sessionId) {

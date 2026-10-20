@@ -62,6 +62,9 @@ public class ChatbotService {
 	static final String EXAMPLE = " 예: \"고통은 6점이고 잠은 6시간 잤어요.\"";
 	static final String FINISH_TEXT = "기록을 마칠게요";
 
+	/** 기록 화면의 막대로 언제든 직접 고칠 수 있는 항목 */
+	private static final Set<String> ADJUSTABLE_FIELDS = Set.of("painIndex", "sleepHours");
+
 	/** 선택지로 답을 받는 항목. 특이사항은 글로 받지만 "없어요"는 선택지로 고를 수 있다. */
 	private static final Set<String> CHOICE_FIELDS = Set.of("painIndex", "bodyParts", "sleepHours", "medication", "skinSigns", "notes");
 
@@ -141,6 +144,36 @@ public class ChatbotService {
 		}
 		draft.markFollowUp(false);
 		return choiceTurn(context, draft, choiceText(field, request.skipped(), draft.toResponse()), false);
+	}
+
+	/**
+	 * 기록 화면의 막대로 고통 지수·수면 시간을 직접 고친다. 지금 묻는 항목이 아니어도 반영하고,
+	 * 대화에도 남겨 채팅과 기록 화면이 같은 값을 보게 한다. 지금 묻던 항목이면 그 질문에 답한 것으로 보고 다음으로 넘어간다.
+	 * 기록이 이미 저장되어 있으면 바로 다시 저장한다.
+	 */
+	public ChatReplyResponse adjustValue(Long memberId, String sessionId, ChatChoiceRequest request) {
+		consentService.requireConsent(memberId);
+		TurnContext context = loadRecordTurn(memberId, sessionId);
+		ChatDraft draft = ChatDraft.fromJson(jsonMapper, context.draftJson());
+
+		String field = request.field();
+		if (!ADJUSTABLE_FIELDS.contains(field) || request.skipped() || request.value() == null) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "막대로 고칠 수 있는 항목이 아닙니다.");
+		}
+		boolean answering = field.equals(draft.askingField());
+		ObjectNode updates = jsonMapper.createObjectNode();
+		updates.set(field, jsonMapper.valueToTree(request.value()));
+		if (draft.apply(updates) != ChatDraft.ApplyResult.OK) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT, "선택한 값이 올바르지 않습니다.");
+		}
+		if (answering) {
+			draft.markFollowUp(false);
+		}
+		ChatDraftResponse values = draft.toResponse();
+		String userText = "painIndex".equals(field)
+			? "고통 지수를 " + values.painIndex() + "점으로 할게요"
+			: "수면 시간을 " + values.sleepHours().stripTrailingZeros().toPlainString() + "시간으로 할게요";
+		return choiceTurn(context, draft, userText, false);
 	}
 
 	/** "기록 마치기" 버튼. 필수 항목이 채워졌으면 남은 선택 항목을 묻지 않고 확인 단계로 넘어간다. */

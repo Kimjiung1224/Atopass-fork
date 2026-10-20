@@ -32,6 +32,12 @@ export const chatbotApi = {
       .post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/choices`, body)
       .then(unwrap),
 
+  /** 기록 화면의 막대로 고친 고통 지수·수면 시간. 지금 묻는 항목이 아니어도 반영되고 LLM을 부르지 않는다 */
+  adjustValue: (sessionId: string, body: { field: 'painIndex' | 'sleepHours'; value: number }) =>
+    client
+      .post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/values`, body)
+      .then(unwrap),
+
   /** "기록 마치기" — 필수 항목(고통 지수)이 채워졌으면 확인 단계로 넘어간다 */
   finish: (sessionId: string) =>
     client.post<ApiSuccess<SendMessageResponse>>(`/chatbot/sessions/${sessionId}/finish`).then(unwrap),
