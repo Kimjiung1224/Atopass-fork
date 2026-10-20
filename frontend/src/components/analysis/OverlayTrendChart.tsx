@@ -10,18 +10,35 @@ export type AuxKey = 'sleep' | 'temperature' | 'humidity';
 
 type DailyValue = { date: string; value: number | null };
 
-/** 보조 지표 표시 방법. near: 평균과 차이가 이보다 작으면 "평균 수준"으로 본다 */
-const AUX_METRICS: { key: AuxKey; label: string; unit: string; digits: number; near: number; more: string; less: string }[] = [
-  { key: 'sleep', label: '수면 시간', unit: '시간', digits: 1, near: 0.3, more: '많음', less: '적음' },
-  { key: 'temperature', label: '기온', unit: '°C', digits: 1, near: 0.3, more: '높음', less: '낮음' },
-  { key: 'humidity', label: '습도', unit: '%', digits: 0, near: 3, more: '높음', less: '낮음' },
+/**
+ * 보조 지표 표시 방법. near: 평균과 차이가 이보다 작으면 "평균 수준"으로 본다.
+ * swing: 평균에서 이만큼 벗어나야 그래프 위아래 끝까지 간다. 작은 차이가 크게 출렁이지 않도록 지표마다 고정한다.
+ */
+const AUX_METRICS: {
+  key: AuxKey;
+  label: string;
+  unit: string;
+  digits: number;
+  near: number;
+  swing: number;
+  more: string;
+  less: string;
+}[] = [
+  { key: 'sleep', label: '수면 시간', unit: '시간', digits: 1, near: 0.3, swing: 3, more: '많음', less: '적음' },
+  { key: 'temperature', label: '기온', unit: '°C', digits: 1, near: 0.3, swing: 10, more: '높음', less: '낮음' },
+  { key: 'humidity', label: '습도', unit: '%', digits: 0, near: 3, swing: 30, more: '높음', less: '낮음' },
 ];
+
+/** 보조 지표의 평균이 놓이는 높이(0~1)와, 평균에서 가장 멀리 벗어났을 때 위아래로 움직이는 폭 */
+const AUX_CENTER = 0.5;
+const AUX_AMPLITUDE = 0.4;
 
 interface Props {
   /** 날짜별 고통 지수. 기록 없는 날은 null. 이 날짜들이 그래프의 가로축이 된다 */
   pain: DailyValue[];
   aux: Record<AuxKey, DailyValue[]>;
-  enabled: Set<AuxKey>;
+  /** 고통 지수 위에 겹친 보조 지표. 한 번에 하나만, 없으면 null */
+  active: AuxKey | null;
   onToggle: (key: AuxKey) => void;
 }
 
@@ -33,20 +50,22 @@ const valuesOf = (data: DailyValue[]) => data.map((d) => d.value).filter((v): v 
 
 const average = (values: number[]) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
 
-/** 기간 내 최소~최대를 0~1로 바꾼다. 값이 하나뿐이거나 전부 같으면 가운데(0.5)에 둔다 */
-function normalizer(data: DailyValue[]) {
-  const values = valuesOf(data);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  return (v: number | null) => (v === null ? null : max === min ? 0.5 : (v - min) / (max - min));
+/**
+ * 기간 평균을 가운데(0.5)에 두고, 평균보다 높으면 위로·낮으면 아래로 그린다.
+ * 평균과의 차이를 swing으로 나눠 0.1~0.9 사이에 들어오게 하고, swing보다 크게 벗어난 날은 끝에 붙인다.
+ */
+function normalizer(data: DailyValue[], swing: number) {
+  const avg = average(valuesOf(data)) ?? 0;
+  return (v: number | null) =>
+    v === null ? null : AUX_CENTER + Math.max(-1, Math.min(1, (v - avg) / swing)) * AUX_AMPLITUDE;
 }
 
 /**
  * '전체' 탭 그래프. 고통 지수(0~10)를 굵은 빨간 선으로 크게 그리고,
- * 수면 시간·기온·습도는 기간 내 상대 위치(0~1)로 바꿔 보이지 않는 보조 축에 얇은 점선으로 겹친다.
+ * 고른 보조 지표(수면 시간·기온·습도 중 하나)는 기간 평균을 가운데에 두고 보이지 않는 보조 축에 얇은 점선으로 겹친다.
  * 그래프를 누르거나 마우스를 올린 날의 실제 값은 그래프 아래에 보여 준다(기본 툴팁 대신).
  */
-export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Props) {
+export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props) {
   const isDark = useIsDark();
   const theme = isDark ? CHART_DARK : CHART;
   const painColor = isDark ? PAIN_COLOR.dark : PAIN_COLOR.light;
@@ -59,7 +78,7 @@ export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Prop
   const aligned = Object.fromEntries(
     AUX_METRICS.map((m) => [m.key, pain.map((p) => ({ date: p.date, value: auxByDate[m.key].get(p.date) ?? null }))]),
   ) as Record<AuxKey, DailyValue[]>;
-  const normalize = Object.fromEntries(AUX_METRICS.map((m) => [m.key, normalizer(aligned[m.key])])) as Record<
+  const normalize = Object.fromEntries(AUX_METRICS.map((m) => [m.key, normalizer(aligned[m.key], m.swing)])) as Record<
     AuxKey,
     (v: number | null) => number | null
   >;
@@ -105,7 +124,7 @@ export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Prop
           고통 지수
         </span>
         {AUX_METRICS.map((m) => {
-          const isOn = enabled.has(m.key);
+          const isOn = active === m.key;
           return (
             <button
               key={m.key}
@@ -126,7 +145,8 @@ export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Prop
       </div>
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
-        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 내 상대 위치로 겹쳤고, 실제 값은 아래에서 볼 수 있어요.
+        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 가운데 옅은 선이 기간 평균이고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 실제
+        값은 아래에서 볼 수 있어요.
       </p>
 
       <div
@@ -148,8 +168,11 @@ export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Prop
               tick={theme.tick}
             />
             {/* 보조 지표(0~1)가 그래프 위아래 끝에 붙지 않게 조금 여유를 둔다 */}
-            <YAxis yAxisId="aux" orientation="right" domain={[-0.05, 1.05]} hide />
-            {AUX_METRICS.filter((m) => enabled.has(m.key)).map((m) => (
+            <YAxis yAxisId="aux" orientation="right" domain={[0, 1]} hide />
+            {active && (
+              <ReferenceLine yAxisId="aux" y={AUX_CENTER} stroke={AUX_COLORS[active]} strokeOpacity={0.35} strokeWidth={1} />
+            )}
+            {AUX_METRICS.filter((m) => m.key === active).map((m) => (
               <Line
                 key={m.key}
                 yAxisId="aux"
@@ -205,7 +228,7 @@ export default function OverlayTrendChart({ pain, aux, enabled, onToggle }: Prop
               </>
             )}
           </p>
-          {AUX_METRICS.filter((m) => enabled.has(m.key)).map((m) => {
+          {AUX_METRICS.filter((m) => m.key === active).map((m) => {
             const value = auxByDate[m.key].get(shownDate) ?? null;
             const avg = average(valuesOf(aligned[m.key]));
             const diff = value === null || avg === null ? null : value - avg;

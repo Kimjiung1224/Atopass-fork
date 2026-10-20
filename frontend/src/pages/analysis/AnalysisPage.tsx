@@ -70,8 +70,8 @@ export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overlay');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
-  // '전체' 탭에서 고통 지수 위에 겹쳐 볼 보조 지표. 기본은 수면 시간·기온만 켠다.
-  const [overlayKeys, setOverlayKeys] = useState<Set<AuxKey>>(() => new Set<AuxKey>(['sleep', 'temperature']));
+  // '전체' 탭에서 고통 지수 위에 겹쳐 볼 보조 지표. 한 번에 하나만 겹치고, 처음에는 고통 지수만 보여 준다.
+  const [overlayKey, setOverlayKey] = useState<AuxKey | null>(null);
   // 그래프에서 누른 날. 화면을 옮기지 않고 그래프 아래에 그날 기록을 보여 준다.
   const [selected, setSelected] = useState<{ date: string; recordId: number } | null>(null);
 
@@ -136,14 +136,8 @@ export default function AnalysisPage() {
     return toDailySeries(items, weatherRange.startDate, weatherRange.endDate, false);
   }, [records.data, weatherRange]);
 
-  const toggleOverlayKey = (key: AuxKey) => {
-    setOverlayKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
+  // 다른 지표를 누르면 그 지표로 바꾸고, 켜진 지표를 다시 누르면 끈다.
+  const toggleOverlayKey = (key: AuxKey) => setOverlayKey((prev) => (prev === key ? null : key));
 
   const selectDay = (datum: TrendDatum) => {
     if (datum.recordId !== null) setSelected({ date: datum.date, recordId: datum.recordId });
@@ -205,7 +199,7 @@ export default function AnalysisPage() {
                 key={period}
                 pain={overlayScoreSeries}
                 aux={{ sleep: overlaySleepSeries, temperature: temperatureSeries, humidity: humiditySeries }}
-                enabled={overlayKeys}
+                active={overlayKey}
                 onToggle={toggleOverlayKey}
               />
             )
