@@ -11,6 +11,7 @@ import {
   CHAT_SLEEP_HOURS_DEFAULT,
   PAIN_INDEX_MIN,
   PENDING_FIELD_LABELS,
+  SKIN_SIGN_DESCRIPTIONS,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
 
@@ -244,11 +245,14 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
                   aria-pressed={selected}
                   onClick={() => toggle(sign)}
                   disabled={disabled}
-                  className={`min-h-11 rounded-xl border px-3 text-base ${
-                    selected ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
+                  className={`flex min-h-11 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left ${
+                    selected ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
-                  {SKIN_SIGN_LABELS[sign]}
+                  <span className={`text-base ${selected ? 'font-semibold' : ''}`}>{SKIN_SIGN_LABELS[sign]}</span>
+                  <span className={`text-sm leading-snug ${selected ? 'text-emerald-700' : 'text-gray-500'}`}>
+                    {SKIN_SIGN_DESCRIPTIONS[sign]}
+                  </span>
                 </button>
               );
             })}
