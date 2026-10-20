@@ -145,7 +145,7 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
       </div>
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
-        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 가운데 옅은 선이 기간 평균이고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 실제
+        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 실제
         값은 아래에서 볼 수 있어요.
       </p>
 
@@ -169,9 +169,6 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
             />
             {/* 보조 지표(0~1)가 그래프 위아래 끝에 붙지 않게 조금 여유를 둔다 */}
             <YAxis yAxisId="aux" orientation="right" domain={[0, 1]} hide />
-            {active && (
-              <ReferenceLine yAxisId="aux" y={AUX_CENTER} stroke={AUX_COLORS[active]} strokeOpacity={0.35} strokeWidth={1} />
-            )}
             {AUX_METRICS.filter((m) => m.key === active).map((m) => (
               <Line
                 key={m.key}
