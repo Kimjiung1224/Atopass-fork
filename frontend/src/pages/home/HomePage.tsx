@@ -11,6 +11,7 @@ import { formatKoreanDate, today } from '@/utils/date';
 import { eachDay, formatMonthDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { recordPath } from '@/utils/routes';
+import VisitCard from './VisitCard';
 import WeatherCard from './WeatherCard';
 import WeeklyScoreChart, { type DailyScore } from './WeeklyScoreChart';
 
@@ -60,6 +61,8 @@ export default function HomePage() {
           <p className="text-gray-500">{formatKoreanDate(todayString)}</p>
           <p className="mt-1 text-xl font-bold">{me.data ? `${me.data.nickname}님, 안녕하세요` : '안녕하세요'}</p>
         </section>
+
+        <VisitCard />
 
         <WeatherCard />
 

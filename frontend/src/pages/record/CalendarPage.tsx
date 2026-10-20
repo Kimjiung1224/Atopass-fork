@@ -6,11 +6,10 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import ComparisonView from '@/components/record/ComparisonView';
 import { useAsync } from '@/hooks/useAsync';
-import { toDateString, today } from '@/utils/date';
+import { monthCells, monthRange, WEEKDAYS } from '@/utils/calendar';
+import { today } from '@/utils/date';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { recordPath } from '@/utils/routes';
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 고통 지수 구간별 표시 색 */
 const SCORE_LEVELS = [
@@ -19,21 +18,6 @@ const SCORE_LEVELS = [
   { max: 10, label: '7~10점', className: 'bg-red-500' },
 ];
 const scoreColor = (score: number) => SCORE_LEVELS.find((level) => score <= level.max)!.className;
-
-/** 해당 달의 1일 ~ 말일 (yyyy-MM-dd) */
-function monthRange(year: number, month: number) {
-  return { startDate: toDateString(new Date(year, month, 1)), endDate: toDateString(new Date(year, month + 1, 0)) };
-}
-
-/** 달력 칸: 앞쪽 빈칸(null) + 1일부터 말일까지 */
-function monthCells(year: number, month: number): (string | null)[] {
-  const blanks = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  return [
-    ...Array<null>(blanks).fill(null),
-    ...Array.from({ length: days }, (_, i) => toDateString(new Date(year, month, i + 1))),
-  ];
-}
 
 /**
  * 캘린더 — /calendar. 월별 기록 여부와 대표 점수를 보여 주고, 날짜를 누르면 그날 기록으로 이동한다.
