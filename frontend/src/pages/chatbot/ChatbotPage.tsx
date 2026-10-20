@@ -4,7 +4,6 @@ import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
-import PendingFieldList from '@/components/chatbot/PendingFieldList';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
@@ -21,7 +20,6 @@ export default function ChatbotPage() {
   const recordDate = today();
   const {
     messages,
-    pendingFields,
     askingField,
     requiresConfirmation,
     painIndex,
@@ -50,8 +48,6 @@ export default function ChatbotPage() {
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
   const textLocked = started && choiceField !== null && choiceField !== 'notes';
-  // 부위를 고르는 동안에는 마네킹에 집중하도록 남은 항목을 숨긴다
-  const pickingParts = choiceField === 'bodyParts';
 
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
   const pendingPhotos = draft.photos;
@@ -111,7 +107,6 @@ export default function ChatbotPage() {
         )}
       </div>
 
-      {!requiresConfirmation && !pickingParts && <PendingFieldList fields={pendingFields} />}
 
       {/* 질문에 맞는 선택지(막대·버튼)가 아래에서 올라온다. 답을 보내는 동안에는 내려가 있고, 다음 질문과 함께 다시 올라온다 */}
       {choiceField && status === 'ready' && (
