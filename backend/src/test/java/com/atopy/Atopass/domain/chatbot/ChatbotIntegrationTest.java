@@ -127,7 +127,7 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			 "updates": {"painIndex": 4}}""");
 		llm.enqueue("""
 			{"understood": true, "reply": "다른 건요?",
-			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["notes"]}}""");
+			 "updates": {"sleepHours": 6, "medication": false, "skinSigns": [], "skipped": ["bodyParts", "notes"]}}""");
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 4점"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
@@ -135,7 +135,9 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
 			.andExpect(jsonPath("$.data.pendingFields").isEmpty())
-			.andExpect(jsonPath("$.data.reply").value("입력하신 내용을 정리했어요. 아래 내용을 확인하고 저장해 주세요."))
+			.andExpect(jsonPath("$.data.reply").value(org.hamcrest.Matchers.allOf(
+				org.hamcrest.Matchers.startsWith("오늘 기록을 저장했어요. 오늘의 총정리예요.\n- 고통 지수: 4점"),
+				org.hamcrest.Matchers.endsWith("오늘 하루도 정말 수고 많으셨어요! 바꿀 내용이 생기면 언제든 여기에 글로 적어 주세요. 바로 고쳐 둘게요."))))
 			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0));
 	}
 
@@ -149,7 +151,8 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 
 		mockMvc.perform(sendMessage(bearer, session, "고통은 3점이고 그만할게요"))
 			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
-			.andExpect(jsonPath("$.data.pendingFields[0]").value("sleepHours"));
+			.andExpect(jsonPath("$.data.recordId").isNumber())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
 	}
 
 	@Test
@@ -266,12 +269,15 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 	}
 
 	@Test
-	void 질문은_고통_지수_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
+	void 질문은_고통_지수_부위_수면_약_복용_증상_특이사항_순서로_이어진다() throws Exception {
 		String bearer = newMemberBearer();
 		String session = createSession(bearer, "RECORD");
 
 		llm.enqueue("{\"understood\": true, \"updates\": {\"painIndex\": 5}}");
 		mockMvc.perform(sendMessage(bearer, session, "5점"))
+			.andExpect(jsonPath("$.data.reply").value("어느 부위가 그렇게 불편했나요? 해당하는 부위를 모두 골라 주세요."));
+		llm.enqueue("{\"understood\": true, \"updates\": {\"conditions\": [{\"bodyPart\": \"FACE\", \"pain\": 5}]}}");
+		mockMvc.perform(sendMessage(bearer, session, "얼굴이요"))
 			.andExpect(jsonPath("$.data.reply").value("어젯밤 몇 시간 주무셨나요?"));
 		llm.enqueue("{\"understood\": true, \"updates\": {\"sleepHours\": 8}}");
 		mockMvc.perform(sendMessage(bearer, session, "8시간"))
@@ -458,6 +464,141 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 			.andExpect(status().isOk());
 	}
 
+	// ── 저장된 기록 고치기 ──
+
+	@Test
+	void 그날_기록이_있으면_저장된_내용을_불러와_수정할_내용이_있는지_묻는다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String first = createSession(bearer, "RECORD");
+		saveRecord(bearer, first, saveBody(today, true, Map.of("pain", 4), 6)).andExpect(status().isCreated());
+
+		String second = createSession(bearer, "RECORD");
+
+		// 하루에 대화 하나를 이어 간다: 저장한 대화를 다시 열어 고치는 대화로 쓴다.
+		assertThat(second).isEqualTo(first);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + second + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages.length()").value(1))
+			.andExpect(jsonPath("$.data.messages[0].role").value("ASSISTANT"))
+			.andExpect(jsonPath("$.data.messages[0].content").value(org.hamcrest.Matchers.allOf(
+				org.hamcrest.Matchers.containsString("오늘 기록이 이미 저장되어 있어요."),
+				org.hamcrest.Matchers.containsString("- 팔: 고통 4점"),
+				org.hamcrest.Matchers.containsString("- 수면 시간: 6시간"),
+				org.hamcrest.Matchers.containsString("수정할 내용이 있나요?"))));
+		// 저장된 값이 초안으로 들어오고, 빈 항목을 다시 묻지 않는다.
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + second + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(4))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(6.0))
+			.andExpect(jsonPath("$.data.askingField").value("painIndex"))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(false));
+		// 나갔다 들어와도 같은 수정 세션을 이어서 쓴다.
+		assertThat(createSession(bearer, "RECORD")).isEqualTo(second);
+	}
+
+	@Test
+	void 수정_세션에서_바꾼_내용을_저장하면_기존_기록을_수정한다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String first = createSession(bearer, "RECORD");
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		((Map<String, Object>) body.get("record")).put("painIndex", 5);
+		String created = saveRecord(bearer, first, body).andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.askingField").doesNotExist())
+			.andExpect(jsonPath("$.data.pendingFields").isEmpty());
+		llm.enqueue("{\"understood\": true, \"reply\": \"수면 시간을 8시간으로 바꿨어요.\", "
+			+ "\"updates\": {\"sleepHours\": 8}, \"finished\": false, \"followUp\": false}");
+		mockMvc.perform(sendMessage(bearer, session, "잠은 8시간 잤어요"))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.draft.painIndex").value(5))
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true))
+			.andExpect(jsonPath("$.data.editing").value(true))
+			.andExpect(jsonPath("$.data.recordId").value(recordId))
+			.andExpect(jsonPath("$.data.reply").value(
+				"수면 시간을 8시간으로 바꿨어요.\n바로 반영해서 저장했어요. 지금 기록은 아래와 같아요.\n- 고통 지수: 5점\n- 팔: 고통 4점\n- 수면 시간: 8시간\n- 나타난 증상: 없음"));
+		assertThat(llm.lastSystemPrompt()).contains("[기록 수정]");
+		// 글로 고치면 저장 버튼 없이 바로 기존 기록이 수정된다.
+		mockMvc.perform(get("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.sleepHours").value(8.0))
+			.andExpect(jsonPath("$.data.painIndex").value(5));
+
+		// 바꿀 게 없다고 하면 다시 저장하지 않고 답만 한다.
+		llm.enqueue("{\"understood\": true, \"reply\": \"알겠어요. 오늘 하루도 수고 많으셨어요!\", \"updates\": {}, \"finished\": true}");
+		mockMvc.perform(sendMessage(bearer, session, "없어요"))
+			.andExpect(jsonPath("$.data.reply").value("알겠어요. 오늘 하루도 수고 많으셨어요!"));
+
+		// 나갔다 들어와도 같은 대화가 이어지고, 내용이 남아 있다.
+		assertThat(createSession(bearer, "RECORD")).isEqualTo(session);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages.length()").value(5));
+	}
+
+	@Test
+	void 수정_세션에서는_증상과_부위를_글로_지울_수_있다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		Map<String, Object> body = saveBody(today, true, Map.of("pain", 4), 6);
+		Map<String, Object> record = (Map<String, Object>) body.get("record");
+		record.put("painIndex", 5);
+		record.put("skinSigns", List.of("ITCHING", "XEROSIS"));
+		saveRecord(bearer, createSession(bearer, "RECORD"), body).andExpect(status().isCreated());
+
+		String session = createSession(bearer, "RECORD");
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + session + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.editing").value(true));
+		llm.enqueue("{\"understood\": true, \"reply\": \"가려움과 팔을 뺐어요.\", "
+			+ "\"updates\": {\"removeSkinSigns\": [\"ITCHING\"], \"removeBodyParts\": [\"ARM\"]}}");
+		mockMvc.perform(sendMessage(bearer, session, "가려움은 없어졌고 팔은 빼 주세요"))
+			.andExpect(jsonPath("$.data.draft.skinSigns.length()").value(1))
+			.andExpect(jsonPath("$.data.draft.skinSigns[0]").value("XEROSIS"))
+			.andExpect(jsonPath("$.data.draft.skinConditions").isEmpty())
+			.andExpect(jsonPath("$.data.requiresConfirmation").value(true));
+	}
+
+	@Test
+	void 총정리에서_기록을_만들거나_고치면_대화로_불러오고_지우면_새로_시작한다() throws Exception {
+		String bearer = newMemberBearer();
+		String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+		String chatting = createSession(bearer, "RECORD");
+
+		// 챗봇 대화 중에 총정리에서 직접 기록을 만들면, 다시 들어올 때 그 기록을 고치는 세션이 열린다.
+		Map<String, Object> direct = new LinkedHashMap<>((Map<String, Object>) saveBody(today, true, Map.of("pain", 3), 7).get("record"));
+		direct.put("recordDate", today);
+		String created = mockMvc.perform(withJson(post("/api/v1/records").header(AUTH, bearer), direct))
+			.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+		long recordId = jsonMapper.readTree(created).get("data").get("recordId").asLong();
+		String editing = createSession(bearer, "RECORD");
+		assertThat(editing).isEqualTo(chatting);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + editing + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.recordId").value(recordId))
+			.andExpect(jsonPath("$.data.draft.painIndex").doesNotExist())
+			.andExpect(jsonPath("$.data.draft.skinConditions[0].symptoms.pain").value(3));
+
+		// 총정리에서 기록을 고치면 다시 들어올 때 최신 내용을 불러오고 알려 준다.
+		direct.put("sleepHours", 9);
+		mockMvc.perform(withJson(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.put("/api/v1/records/" + recordId).header(AUTH, bearer), direct))
+			.andExpect(status().isOk());
+		assertThat(createSession(bearer, "RECORD")).isEqualTo(editing);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + editing + "/draft").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.draft.sleepHours").value(9.0));
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + editing + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages[-1].content").value(
+				org.hamcrest.Matchers.startsWith("다른 화면에서 바뀐 기록을 불러왔어요.")));
+
+		// 기록을 지우면 빈 세션으로 새로 시작한다.
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.delete("/api/v1/records/" + recordId).header(AUTH, bearer))
+			.andExpect(status().is2xxSuccessful());
+		String fresh = createSession(bearer, "RECORD");
+		assertThat(fresh).isNotEqualTo(editing);
+		mockMvc.perform(get("/api/v1/chatbot/sessions/" + fresh + "/messages").header(AUTH, bearer))
+			.andExpect(jsonPath("$.data.messages").isEmpty());
+	}
+
 	@Test
 	void 저장할_내용이_규칙에_어긋나면_일반_기록_생성과_같은_오류를_준다() throws Exception {
 		String bearer = newMemberBearer();
@@ -587,6 +728,11 @@ class ChatbotIntegrationTest extends ApiTestSupport {
 		String bearer, String session, String message) {
 		return withJson(post("/api/v1/chatbot/sessions/" + session + "/messages").header(AUTH, bearer),
 			Map.of("message", message));
+	}
+
+	private org.springframework.test.web.servlet.ResultActions saveRecord(
+		String bearer, String session, Map<String, Object> body) throws Exception {
+		return mockMvc.perform(withJson(post("/api/v1/chatbot/sessions/" + session + "/records").header(AUTH, bearer), body));
 	}
 
 	private Map<String, Object> saveBody(String date, boolean confirmed, Map<String, Object> symptoms, int sleepHours) {

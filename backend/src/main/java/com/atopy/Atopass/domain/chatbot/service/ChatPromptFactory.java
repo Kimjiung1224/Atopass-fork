@@ -33,6 +33,14 @@ class ChatPromptFactory {
 		SkinSign.XEROSIS, "건조해요, 당겨요, 하얗게 일어나요, 각질이 생겨요",
 		SkinSign.ITCHING, "가려워요, 간지러워요"));
 
+	/** 저장된 기록을 고칠 때 덧붙이는 안내 */
+	static final String EDITING_GUIDE = """
+		[기록 수정] 오늘 기록은 이미 저장되어 있고, 위 초안이 저장된 내용입니다. 사용자는 바꿀 내용을 말합니다.
+		- 사용자가 값을 바꾸면 바뀐 값만 updates에 넣고, reply로 무엇을 바꿨는지 한 문장으로 알려 줍니다. (예: "수면 시간을 8시간으로 바꿨어요.")
+		- 바꿀 내용이 없다고 하면 updates는 비우고 finished를 true로 하고, reply로 짧게 인사합니다. (예: "알겠어요. 오늘 하루도 수고 많으셨어요!")
+		- 특이사항을 지워 달라고 하면 notes를 ""로 넣습니다. 특이사항을 바꾸면 사용자가 쓴 새 문장 전체를 notes에 넣습니다.
+		""";
+
 	private final JsonMapper jsonMapper;
 
 	/** 기록 모드: 사용자의 말에서 값을 뽑아 초안을 채우고, 빠진 정보만 되묻는다. */
@@ -45,17 +53,19 @@ class ChatPromptFactory {
 			   이 항목들은 앱이 정해진 문장과 선택지 버튼으로 직접 묻습니다. 당신은 사용자가 글로 쓴 말에서 값을 뽑습니다.
 			1. 고통 지수(painIndex): 오늘 피부 때문에 느낀 고통의 정도. 0~10 정수 (0은 없음, 10은 매우 심함, 사용자가 느끼는 주관적인 정도).
 			   사용자가 숫자를 말하지 않았다면 점수를 정하지 말고, 0~10 중 몇 점인지 물어보세요.
-			2. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
-			3. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
-			4. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
-			5. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
+			2. 고통이 있는 부위(bodyParts): 고통 지수와 한 묶음으로, 고통 지수 바로 다음에 앱이 부위 선택지로 묻습니다(0점이면 묻지 않습니다).
+			   사용자가 글로 부위를 말하면 아래 부위 기록(conditions)에 넣습니다. 부위가 없다고 하면 skipped에 bodyParts를 넣습니다.
+			3. 수면 시간(sleepHours): 어젯밤 잔 시간. 시간 단위 숫자 (0~24). 수면 점수는 서버가 계산하므로 묻지 않습니다.
+			4. 약 복용 여부(medication): 오늘 약을 복용했는지. 예면 true, 아니오면 false.
+			5. 나타난 증상(skinSigns): 아래 [증상 목록] 7가지 중 오늘 나타난 것을 모두 고릅니다. 하나도 없으면 빈 배열 []입니다.
+			6. 특이사항(notes): 평소와 다른 점을 자유롭게 500자 이내로. 사용자가 쓴 문장을 고치지 말고 그대로 넣습니다.
 
 			[증상 목록] 이름(뜻을 쉬운 말로 / 사용자가 흔히 하는 말)
 			%s
 			   사용자는 의학 용어 대신 일상적인 말로 증상을 이야기합니다. 위의 쉬운 말과 흔한 표현을 보고 맞는 증상을 고릅니다.
 			   어느 증상인지 확실하지 않으면 추측하지 말고 쉬운 말로 되물어 봅니다.
 
-			[묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
+			[부위 기록과, 묻지 않지만 사용자가 먼저 말하면 기록하는 항목]
 			- 부위 기록(conditions): 부위마다 고통 점수(pain, 0~10 정수)와 그 부위에 나타난 증상(skinSigns, [증상 목록]의 이름)을 기록합니다.
 			  부위 FACE(얼굴), NECK(목), TRUNK(몸), RIGHT_UPPER_ARM(오른팔 상박), RIGHT_FOREARM(오른팔 하박), LEFT_UPPER_ARM(왼팔 상박), LEFT_FOREARM(왼팔 하박),
 			  GROIN(사타구니), RIGHT_THIGH(오른다리 상박), RIGHT_LOWER_LEG(오른다리 하박), LEFT_THIGH(왼다리 상박), LEFT_LOWER_LEG(왼다리 하박),
@@ -66,6 +76,7 @@ class ChatPromptFactory {
 			[오늘 날짜] %s
 			[현재까지 모은 초안] %s
 			[아직 입력되지 않은 항목] %s
+			%s
 
 			[규칙]
 			1. 초안에 이미 있는 정보는 다시 묻지 않습니다. 빠진 정보만 질문합니다.
@@ -75,6 +86,9 @@ class ChatPromptFactory {
 			5. 수면, 약 복용, 특이사항에 대해 사용자가 "모르겠어요", "넘어갈게요"처럼 답하면 skipped에 sleepHours, medication, notes 중 해당하는 것을 넣습니다.
 			   나타난 증상이 하나도 없다고 하면 skinSigns를 []로 넣고, 답하지 않겠다고 하면 skipped에 skinSigns를 넣습니다. 특이사항이 없다고 하면 skipped에 notes를 넣습니다.
 			6. 사용자가 그만하겠다거나 바로 저장하겠다고 하면 finished를 true로 합니다.
+			   이미 말한 값을 고치면 새 값을 updates에 넣습니다. 나타난 증상을 지워 달라고 하면 removeSkinSigns에 증상 이름을,
+			   부위를 빼 달라고 하면 removeBodyParts에 부위 이름을 넣습니다.
+			   (예: "가려움은 없어졌어요" → {"removeSkinSigns": ["ITCHING"]}, "얼굴은 빼 주세요" → {"removeBodyParts": ["FACE"]})
 			7. 기록과 관련 없는 말이거나 이해할 수 없으면 understood를 false로 하고, reply로 정중하게 다시 물어봅니다.
 			8. 사용자가 부위를 말했지만 그 부위의 고통 점수를 말하지 않았다면, 반드시 다음 문장으로 묻습니다.
 			   "{부위}의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?" (예: "얼굴의 고통 정도를 점수로 나타내면 0~10점 중 몇 점인가요?")
@@ -87,7 +101,8 @@ class ChatPromptFactory {
 			{"understood": true, "reply": "다음 질문 또는 안내 문장", "updates": {"painIndex": 6, "sleepHours": 6, "medication": true, "skinSigns": ["XEROSIS", "EXCORIATION"], "notes": "메모", "skipped": ["notes"]}, "finished": false, "followUp": false}
 			부위 기록은 conditions에 부위, 고통 점수, 그 부위의 증상을 배열로 넣습니다. 사용자가 "8"이나 "8점"처럼 숫자만 답하면, 바로 전에 물은 부위의 고통 점수로 넣습니다.
 			{"understood": true, "reply": "네, 기록했어요.", "updates": {"conditions": [{"bodyPart": "FACE", "pain": 8, "skinSigns": ["ITCHING", "ERYTHEMA"]}]}, "finished": false, "followUp": false}
-			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields());
+			""".formatted(signList(), today, draft.toPromptJson(jsonMapper), draft.pendingFields(),
+				draft.editing() ? EDITING_GUIDE : "");
 	}
 
 	/** 증상 목록을 "- XEROSIS 건조증 (피부가 건조하고 … / 건조해요, 당겨요 …)" 줄들로 만든다. */
