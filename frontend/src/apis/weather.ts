@@ -95,9 +95,12 @@ export async function getCurrentWeather(): Promise<CurrentWeather> {
 
 /**
  * 기간별 하루 평균 기온·습도 — Open-Meteo 과거 기상 API(API 키 없음, 백엔드를 거치지 않고 바로 호출).
- * 오늘 날짜까지도 포함해서 내려준다.
+ * 이 API는 UTC 기준 오늘까지만 받는다. 한국 시간 0~9시에는 한국의 오늘이 UTC로는 내일이라
+ * 그대로 보내면 400이 나므로, 끝 날짜를 UTC 오늘로 잘라서 요청한다.
  */
-export async function getHistoricalWeather(startDate: string, endDate: string): Promise<WeatherHistory> {
+export async function getHistoricalWeather(startDate: string, requestedEndDate: string): Promise<WeatherHistory> {
+  const utcToday = new Date().toISOString().slice(0, 10);
+  const endDate = requestedEndDate > utcToday ? utcToday : requestedEndDate;
   if (startDate > endDate) return { locationLabel: '', points: [] };
 
   const location = await getLocation();
