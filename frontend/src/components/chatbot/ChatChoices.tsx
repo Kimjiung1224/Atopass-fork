@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type AnimationEvent, type ReactNode } from 'react';
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
@@ -10,6 +10,7 @@ import {
   BODY_PART_LABELS,
   CHAT_SLEEP_HOURS_DEFAULT,
   PAIN_INDEX_MIN,
+  PENDING_FIELD_LABELS,
   SKIN_SIGN_LABELS,
 } from '@/utils/constants';
 
@@ -27,38 +28,125 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
  * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
  *
  * 질문이 오면 화면 아래에서 올라오고, 답을 고르면 알아서 내려간 뒤 답을 보낸다. 위의 대화는 계속 보인다.
+ * 사용자도 손잡이를 아래로 끌거나 눌러 내려 둘 수 있고, 내려 둔 탭을 위로 끌거나 눌러 다시 올릴 수 있다.
  * 다음 질문의 선택지는 호출부가 key를 바꿔 다시 만들어 올라오게 한다.
  */
 export default function ChatChoices({ field, onChoose, disabled }: Props) {
-  const [closing, setClosing] = useState(false);
+  // open: 올라와 있음 · hiding: 사용자가 내리는 중 · minimized: 내려 둠 · closing: 답을 골라 내려가는 중
+  const [mode, setMode] = useState<'open' | 'hiding' | 'minimized' | 'closing'>('open');
   const [closed, setClosed] = useState(false);
   const picked = useRef<ChatChoiceRequest | null>(null);
 
   const pick = (choice: ChatChoiceRequest) => {
-    if (closing) return;
+    if (mode !== 'open') return;
     picked.current = choice;
-    setClosing(true);
+    setMode('closing');
+  };
+
+  const onAnimationEnd = (e: AnimationEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return; // 안쪽 요소의 움직임은 무시
+    if (mode === 'hiding') setMode('minimized');
+    if (mode === 'closing' && picked.current) {
+      setClosed(true);
+      onChoose(picked.current);
+    }
   };
 
   if (closed) return null;
 
-  // 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다.
-  // 마네킹처럼 긴 선택지는 화면 절반까지만 차지하고 안에서 스크롤해, 위의 대화가 가려지지 않게 한다.
+  const label = PENDING_FIELD_LABELS[field];
+  const minimized = mode === 'minimized';
+
+  return (
+    <>
+      {/* 내려 둔 상태: 작은 탭만 남는다. 위로 끌거나 누르면 다시 올라온다 */}
+      {minimized && (
+        <SheetHandle
+          direction="up"
+          onToggle={() => setMode('open')}
+          className="flex shrink-0 animate-[sheet-up_200ms_ease-out] flex-col items-center gap-1 rounded-t-2xl border-t border-gray-200 bg-gray-50 pb-3 pt-2 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+        >
+          <span className="h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
+          <span className="text-base font-semibold text-emerald-700">{label} 고르기 ▲</span>
+        </SheetHandle>
+      )}
+
+      {/* 마네킹처럼 긴 선택지는 화면 절반까지만 차지하고 안에서 스크롤해, 위의 대화가 가려지지 않게 한다.
+          내려 둔 동안에도 고르던 값을 잃지 않도록 숨기기만 한다 (다시 보이면 올라오는 움직임이 다시 나온다) */}
+      <div
+        onAnimationEnd={onAnimationEnd}
+        className={`max-h-[50dvh] shrink-0 flex-col rounded-t-2xl border-t border-gray-200 bg-gray-50 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ${
+          minimized ? 'hidden' : 'flex'
+        } ${
+          mode === 'closing'
+            ? 'animate-[sheet-down_200ms_ease-in_forwards]'
+            : mode === 'hiding'
+              ? 'animate-[sheet-down_180ms_ease-in_forwards]'
+              : 'animate-[sheet-up_250ms_ease-out]'
+        }`}
+      >
+        <SheetHandle
+          direction="down"
+          onToggle={() => mode === 'open' && setMode('hiding')}
+          className="flex shrink-0 justify-center py-2"
+        >
+          <span className="h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
+        </SheetHandle>
+        <div className="min-h-0 overflow-y-auto px-3 pb-3">
+          {/* 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다 */}
+          <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || mode !== 'open'} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** 이만큼(px) 넘게 끌면 내리거나 올린다. 그보다 짧으면 누른 것으로 보고 바로 바꾼다 */
+const HANDLE_DRAG = 30;
+
+/**
+ * 선택지 패널의 손잡이. direction 쪽으로 끌거나 누르면 onToggle을 부른다 (down: 내리기, up: 올리기).
+ * 반대 방향으로 끈 것은 무시한다.
+ */
+function SheetHandle({
+  direction,
+  onToggle,
+  className,
+  children,
+}: {
+  direction: 'up' | 'down';
+  onToggle: () => void;
+  className: string;
+  children: ReactNode;
+}) {
+  const startY = useRef<number | null>(null);
   return (
     <div
-      onAnimationEnd={() => {
-        if (!closing || !picked.current) return;
-        setClosed(true);
-        onChoose(picked.current);
+      role="button"
+      tabIndex={0}
+      aria-label={direction === 'down' ? '선택지 내리기' : '선택지 올리기'}
+      onPointerDown={(e) => {
+        startY.current = e.clientY;
       }}
-      className={`max-h-[50dvh] shrink-0 overflow-y-auto rounded-t-2xl border-t border-gray-200 bg-gray-50 px-3 pb-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ${
-        closing ? 'animate-[sheet-down_200ms_ease-in_forwards]' : 'animate-[sheet-up_250ms_ease-out]'
-      }`}
+      onPointerUp={(e) => {
+        if (startY.current === null) return;
+        const moved = e.clientY - startY.current; // 아래로 끌면 양수
+        startY.current = null;
+        const tapped = Math.abs(moved) < HANDLE_DRAG;
+        if (tapped || (direction === 'down' ? moved > 0 : moved < 0)) onToggle();
+      }}
+      onPointerCancel={() => {
+        startY.current = null;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
+      className={`cursor-pointer touch-none select-none ${className}`}
     >
-      <div className="flex justify-center py-2" aria-hidden>
-        <span className="h-1.5 w-10 rounded-full bg-gray-300" />
-      </div>
-      <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || closing} />
+      {children}
     </div>
   );
 }

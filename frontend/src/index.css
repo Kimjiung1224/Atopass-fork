@@ -32,10 +32,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-\[sheet-up_250ms_ease-out\] {
-    animation-duration: 1ms;
-  }
-  .animate-\[sheet-down_200ms_ease-in_forwards\] {
-    animation-duration: 1ms;
+  [class*='animate-[sheet-'] {
+    animation-duration: 1ms !important;
   }
 }
