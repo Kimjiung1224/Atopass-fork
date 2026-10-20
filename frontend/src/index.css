@@ -11,3 +11,31 @@ body {
   background: #f9fafb;
   word-break: keep-all;
 }
+
+/* 챗봇 선택지: 질문이 오면 아래에서 올라오고, 답하면 아래로 내려간다 */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[sheet-up_250ms_ease-out\] {
+    animation-duration: 1ms;
+  }
+  .animate-\[sheet-down_200ms_ease-in_forwards\] {
+    animation-duration: 1ms;
+  }
+}

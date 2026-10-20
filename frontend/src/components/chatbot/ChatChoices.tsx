@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import BodyMap from '@/components/record/BodyMap';
 import PainIndexSlider from '@/components/record/PainIndexSlider';
 import SleepHoursSlider from '@/components/record/SleepHoursSlider';
@@ -25,13 +25,40 @@ const SKIN_SIGNS = Object.keys(SKIN_SIGN_LABELS) as SkinSign[];
  * 챗봇이 지금 묻는 항목(askingField)의 선택지. 고른 값은 LLM을 거치지 않고 바로 초안에 반영된다.
  * 특이사항은 글로 받으므로 "없어요"만 보여 준다.
  * 고통 지수와 부위는 한 묶음이라, 고통 지수 다음에 바로 마네킹에서 고통이 있는 부위를 고른다.
+ *
+ * 질문이 오면 화면 아래에서 올라오고, 답을 고르면 알아서 내려간 뒤 답을 보낸다. 위의 대화는 계속 보인다.
+ * 다음 질문의 선택지는 호출부가 key를 바꿔 다시 만들어 올라오게 한다.
  */
 export default function ChatChoices({ field, onChoose, disabled }: Props) {
+  const [closing, setClosing] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const picked = useRef<ChatChoiceRequest | null>(null);
+
+  const pick = (choice: ChatChoiceRequest) => {
+    if (closing) return;
+    picked.current = choice;
+    setClosing(true);
+  };
+
+  if (closed) return null;
+
   // 항목이 바뀌면 고르던 값을 비우도록 key로 다시 만든다.
   // 마네킹처럼 긴 선택지는 화면 절반까지만 차지하고 안에서 스크롤해, 위의 대화가 가려지지 않게 한다.
   return (
-    <div className="max-h-[50dvh] shrink-0 overflow-y-auto border-t border-gray-100 bg-gray-50 px-3 py-3">
-      <ChoiceBody key={field} field={field} onChoose={onChoose} disabled={disabled} />
+    <div
+      onAnimationEnd={() => {
+        if (!closing || !picked.current) return;
+        setClosed(true);
+        onChoose(picked.current);
+      }}
+      className={`max-h-[50dvh] shrink-0 overflow-y-auto rounded-t-2xl border-t border-gray-200 bg-gray-50 px-3 pb-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] ${
+        closing ? 'animate-[sheet-down_200ms_ease-in_forwards]' : 'animate-[sheet-up_250ms_ease-out]'
+      }`}
+    >
+      <div className="flex justify-center py-2" aria-hidden>
+        <span className="h-1.5 w-10 rounded-full bg-gray-300" />
+      </div>
+      <ChoiceBody key={field} field={field} onChoose={pick} disabled={disabled || closing} />
     </div>
   );
 }
