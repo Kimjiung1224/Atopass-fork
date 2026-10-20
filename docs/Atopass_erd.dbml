@@ -199,6 +199,20 @@ Table reports {
   Note: '메타데이터(기간, 옵션, 생성일)는 영구 저장하고 PDF 파일은 30일 뒤 삭제'
 }
 
+Table clinic_visits {
+  id bigint [pk, increment]
+  member_id bigint [not null]
+  visit_date date [not null]
+  created_at datetime [not null, default: `now()`]
+  updated_at datetime [not null, default: `now()`]
+
+  indexes {
+    (member_id, visit_date) [unique, name: 'uk_clinic_visits_member_date']
+  }
+
+  Note: '피부과 재진 날짜. 지난 재진~다음 재진을 한 주기로 보고 홈 D-day, 그래프·보고서 기간으로 쓴다'
+}
+
 // ───────────── 관계 ─────────────
 
 Ref: refresh_tokens.member_id > members.id [delete: cascade]
@@ -210,3 +224,4 @@ Ref: photos.record_id > records.id [delete: cascade]
 Ref: chatbot_sessions.member_id > members.id [delete: cascade]
 Ref: chatbot_messages.session_id > chatbot_sessions.id [delete: cascade]
 Ref: reports.member_id > members.id [delete: cascade]
+Ref: clinic_visits.member_id > members.id [delete: cascade]
