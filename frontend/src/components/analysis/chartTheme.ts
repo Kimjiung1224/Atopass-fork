@@ -14,4 +14,24 @@ export const CHART = {
   surface: '#ffffff',
 } as const;
 
+/** 어두운 화면(html.dark)용 축·격자 색 */
+export const CHART_DARK = {
+  ...CHART,
+  grid: '#374151',
+  cursor: '#9ca3af',
+  tick: { fontSize: 12, fill: '#cbd5e1' },
+  label: '#e5e7eb',
+  surface: '#111827',
+} as const;
+
 export const SCORE_TICKS = [0, 2, 4, 6, 8, 10];
+
+/** '전체' 탭의 고통 지수 선 색 */
+export const PAIN_COLOR = { light: '#E34948', dark: '#E66767' } as const;
+
+/** '전체' 탭 보조 지표 점선 색. 고통 지수 빨강과 헷갈리지 않는 색으로 고정한다 */
+export const AUX_COLORS = {
+  sleep: '#6250D6',
+  temperature: '#1BAF7A',
+  humidity: '#EDA100',
+} as const;

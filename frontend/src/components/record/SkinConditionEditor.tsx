@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { BodyPart, SkinCondition, SkinSign } from '@/types/record';
 import { bodyMapSignCounts, isBodyMapPart, sortSkinSigns } from '@/utils/bodyMap';
-import { BODY_PART_LABELS, PART_PAIN_SYMPTOM, SKIN_SIGN_LABELS } from '@/utils/constants';
+import { BODY_PART_LABELS, PART_PAIN_SYMPTOM, SKIN_SIGN_DESCRIPTIONS, SKIN_SIGN_LABELS } from '@/utils/constants';
 import BodyMap, { BodyMapLegend } from './BodyMap';
 
 interface Props {
@@ -60,7 +60,7 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
               부위 지우기
             </button>
           </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label={`${BODY_PART_LABELS[selected]}에 나타난 증상`}>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label={`${BODY_PART_LABELS[selected]}에 나타난 증상`}>
             {SKIN_SIGNS.map((sign) => {
               const checked = selectedSigns.includes(sign);
               return (
@@ -69,11 +69,14 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
                   type="button"
                   aria-pressed={checked}
                   onClick={() => toggleSign(selected, sign)}
-                  className={`rounded-full border px-3 py-1.5 text-base ${
-                    checked ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-700'
+                  className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left ${
+                    checked ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
-                  {SKIN_SIGN_LABELS[sign]}
+                  <span className={`text-base ${checked ? 'font-semibold' : ''}`}>{SKIN_SIGN_LABELS[sign]}</span>
+                  <span className={`text-sm leading-snug ${checked ? 'text-brand-700' : 'text-gray-500'}`}>
+                    {SKIN_SIGN_DESCRIPTIONS[sign]}
+                  </span>
                 </button>
               );
             })}

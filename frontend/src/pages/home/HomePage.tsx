@@ -11,6 +11,7 @@ import { formatKoreanDate, today } from '@/utils/date';
 import { eachDay, formatMonthDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { recordPath } from '@/utils/routes';
+import VisitCard from './VisitCard';
 import WeatherCard from './WeatherCard';
 import WeeklyScoreChart, { type DailyScore } from './WeeklyScoreChart';
 
@@ -70,6 +71,8 @@ export default function HomePage() {
           </p>
           <p className="mt-1.5 text-sm text-gray-500">오늘의 피부 상태와 생활 습관을 기록하고 변화를 살펴보세요</p>
         </section>
+
+        <VisitCard />
 
         <WeatherCard />
 

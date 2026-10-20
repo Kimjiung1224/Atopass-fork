@@ -80,17 +80,6 @@ export const HUMIDITY_TICKS = [0, 20, 40, 60, 80, 100];
 export const PAIN_INDEX_MIN = 0;
 export const PAIN_INDEX_MAX = 10;
 
-/**
- * 겹쳐보기 그래프의 지표별 고정 색. 순서가 CVD 안전성 근거이므로 항상 같은 순서(슬롯)를 쓴다 —
- * 어떤 지표를 켜고 끄든 같은 지표는 항상 같은 색을 유지한다(선택 순서로 재배정하지 않음).
- */
-export const OVERLAY_SERIES_COLORS = {
-  score: '#2a78d6',
-  sleep: '#eb6834',
-  temperature: '#1baf7a',
-  humidity: '#eda100',
-} as const;
-
 /** 나타난 증상 7가지 — 이 순서로 보여 준다 (1 홍반 … 7 가려움). 서버 SkinSign 선언 순서와 같다 */
 export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   ERYTHEMA: '홍반',
@@ -100,6 +89,17 @@ export const SKIN_SIGN_LABELS: Record<SkinSign, string> = {
   LICHENIFICATION: '태선화',
   XEROSIS: '건조증',
   ITCHING: '가려움',
+};
+
+/** 증상을 쉬운 말로 풀어 쓴 설명. 증상을 고르는 버튼 아래에 작게 보여 준다 (서버 SkinSign의 설명과 같다) */
+export const SKIN_SIGN_DESCRIPTIONS: Record<SkinSign, string> = {
+  ERYTHEMA: '피부가 붉어짐',
+  EDEMA: '피부가 붓거나 오돌토돌 솟아오름, 단단한 멍울',
+  OOZING: '상처에서 진물이 나오거나 딱지가 앉음',
+  EXCORIATION: '긁어서 피부가 까지거나 긁힌 자국이 남음',
+  LICHENIFICATION: '오래 긁어서 피부가 두꺼워지고 거칠어짐, 주름이 깊어짐',
+  XEROSIS: '피부가 건조하고 당기거나 하얗게 일어남',
+  ITCHING: '피부가 가려움',
 };
 
 /** 수면 점수: 7~8시간이 5점, 2시간 벗어날 때마다 1점 감점 (최저 1점) */
@@ -120,7 +120,7 @@ export const NOTES_MAX_LENGTH = 2000;
 export const CHAT_SLEEP_HOURS_OPTIONS = Array.from({ length: 13 }, (_, i) => i);
 export const CHAT_SLEEP_HOURS_DEFAULT = 7;
 
-/** 챗봇 응답 pendingFields → "남은 항목" 표시 문구 */
+/** 챗봇이 묻는 항목 이름 (예: 내려 둔 선택지 탭의 "수면 시간 고르기") */
 export const PENDING_FIELD_LABELS: Record<PendingField, string> = {
   painIndex: '고통 지수',
   bodyParts: '고통 부위',

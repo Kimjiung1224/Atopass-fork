@@ -1,32 +1,47 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { reportApi } from '@/apis/report';
+import { visitApi } from '@/apis/visit';
 import Disclaimer from '@/components/common/Disclaimer';
 import PageHeader from '@/components/common/PageHeader';
+import RangeCalendar from '@/components/report/RangeCalendar';
 import ReportPreview from '@/components/report/ReportPreview';
 import { useAsync } from '@/hooks/useAsync';
 import type { Report } from '@/types/report';
 import { toDateString, today } from '@/utils/date';
-import { formatFullDate, lastNDaysRange } from '@/utils/dateRange';
+import { formatFullDate, formatMonthDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage, getFieldErrors } from '@/utils/errorMessage';
+import { pastCycles, visitCycle } from '@/utils/visit';
 
-const QUICK_RANGES = [
-  { days: 14, label: '2주' },
-  { days: 30, label: '1개월' },
-  { days: 90, label: '3개월' },
-];
+/** 기간 고르는 방법: 이번 재진 주기, 지난 재진 주기(시작일로 구분), 달력에서 직접 */
+type RangeChoice = 'current' | `past:${string}` | 'custom';
 
 /** 사진 외 항목은 API(POST /reports)가 선택을 받지 않아 항상 포함된다 (화면 명세서 4-3 미정) */
 const FIXED_ITEMS = ['증상이 갑자기 심해진 날', '그날·전날의 수면·음주·야외활동', '특이사항 메모'];
 
 export default function ReportPage() {
   const todayString = today();
-  const [range, setRange] = useState(() => lastNDaysRange(30));
+  // 고르기 전에는 지난 재진이 있으면 이번 재진 주기, 없으면 직접 고르기로 시작한다.
+  const [choice, setChoice] = useState<RangeChoice | null>(null);
+  const [customRange, setCustomRange] = useState(() => lastNDaysRange(30));
   const [includePhotos, setIncludePhotos] = useState(false); // 명세 기본값 false
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Report | null>(null);
 
   const reports = useAsync(reportApi.getList, []);
+  const visits = useAsync(visitApi.getList, []);
+
+  const { lastVisit, nextVisit } = visitCycle(visits.data ?? [], todayString);
+  const currentRange = lastVisit ? { startDate: lastVisit, endDate: todayString } : null;
+  // 오늘이 재진 날이면 이번 주기와 같은 기간이 지난 주기에도 생기므로 뺀다.
+  const cycles = pastCycles(visits.data ?? [], todayString).filter((c) => c.startDate !== currentRange?.startDate);
+  const activeChoice: RangeChoice = choice ?? (currentRange ? 'current' : 'custom');
+  const range =
+    activeChoice === 'current' && currentRange
+      ? currentRange
+      : activeChoice.startsWith('past:')
+        ? (cycles.find((c) => `past:${c.startDate}` === activeChoice) ?? customRange)
+        : customRange;
 
   const rangeError =
     range.startDate > range.endDate
@@ -61,44 +76,39 @@ export default function ReportPage() {
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5 rounded-3xl bg-white p-5 shadow-card">
           <fieldset>
             <legend className="mb-2 font-bold text-gray-700">기간</legend>
-            <div className="mb-3 flex flex-wrap gap-1.5">
-              {QUICK_RANGES.map((quick) => {
-                const quickRange = lastNDaysRange(quick.days);
-                const active = quickRange.startDate === range.startDate && quickRange.endDate === range.endDate;
-                return (
-                  <button
-                    key={quick.days}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setRange(quickRange)}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                      active ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'
-                    }`}
-                  >
-                    최근 {quick.label}
-                  </button>
-                );
-              })}
+            <div role="radiogroup" aria-label="기간 고르는 방법" className="mb-3 flex flex-wrap gap-1.5">
+              {currentRange && (
+                <RangeChip checked={activeChoice === 'current'} onClick={() => setChoice('current')}>
+                  지난 재진 이후 ({formatMonthDay(currentRange.startDate)} ~ 오늘)
+                </RangeChip>
+              )}
+              {cycles.map((cycle) => (
+                <RangeChip
+                  key={cycle.startDate}
+                  checked={activeChoice === `past:${cycle.startDate}`}
+                  onClick={() => setChoice(`past:${cycle.startDate}`)}
+                >
+                  재진 {formatMonthDay(cycle.startDate)} ~ {formatMonthDay(cycle.endDate)}
+                </RangeChip>
+              ))}
+              <RangeChip checked={activeChoice === 'custom'} onClick={() => setChoice('custom')}>
+                날짜 직접 고르기
+              </RangeChip>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="date"
-                aria-label="시작일"
-                value={range.startDate}
-                max={todayString}
-                onChange={(e) => e.target.value && setRange((prev) => ({ ...prev, startDate: e.target.value }))}
-                className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
-              />
-              <span className="text-gray-400">~</span>
-              <input
-                type="date"
-                aria-label="종료일"
-                value={range.endDate}
-                max={todayString}
-                onChange={(e) => e.target.value && setRange((prev) => ({ ...prev, endDate: e.target.value }))}
-                className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2.5 focus:border-brand-500 focus:outline-none"
-              />
-            </div>
+            {!visits.loading && !currentRange && (
+              <p className="mb-3 text-sm text-gray-400">홈에서 재진 날짜를 기록하면 재진 사이 기간으로 바로 만들 수 있어요.</p>
+            )}
+            {nextVisit && activeChoice === 'current' && (
+              <p className="mb-3 text-sm text-gray-500">다음 재진({formatFullDate(nextVisit)})에 가져가기 좋아요.</p>
+            )}
+            {activeChoice === 'custom' && (
+              <div className="mb-3 rounded-xl border border-gray-200 p-3">
+                <RangeCalendar value={customRange} onChange={setCustomRange} max={todayString} />
+              </div>
+            )}
+            <p className="font-semibold">
+              {formatFullDate(range.startDate)} ~ {formatFullDate(range.endDate)}
+            </p>
             {rangeError && <p className="mt-1.5 text-sm text-red-600">{rangeError}</p>}
           </fieldset>
 
@@ -203,5 +213,19 @@ export default function ReportPage() {
 
       <Disclaimer />
     </>
+  );
+}
+
+function RangeChip({ checked, onClick, children }: { checked: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-sm font-medium ${checked ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+    >
+      {children}
+    </button>
   );
 }

@@ -15,6 +15,9 @@
   --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 16px rgba(17, 24, 39, 0.05);
 }
 
+/* 어두운 화면은 html에 dark 클래스를 붙였을 때만 쓴다 (OS 설정을 따르면 아직 밝은 색뿐인 화면과 섞인다) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* 고령 사용자도 읽기 쉽도록 기본 글자 크기를 키운다 (프론트/백 정리: 큰 버튼, 쉬운 문구) */
 html {
   font-size: 17px;
@@ -25,4 +28,29 @@ body {
   color: #111827;
   background: #f5f7fb;
   word-break: keep-all;
+}
+
+/* 챗봇 선택지: 질문이 오면 아래에서 올라오고, 답하면 아래로 내려간다 */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='animate-[sheet-'] {
+    animation-duration: 1ms !important;
+  }
 }
