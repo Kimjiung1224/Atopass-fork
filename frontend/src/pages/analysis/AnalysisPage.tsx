@@ -48,11 +48,11 @@ const PERIODS: { value: Period; label: string }[] = [
 ];
 
 const TABS: { value: Tab; label: string }[] = [
+  { value: 'overlay', label: '전체' },
   { value: 'overall', label: '고통 지수' },
   { value: 'bodyPart', label: '부위별' },
   { value: 'sleep', label: '수면·생활' },
   { value: 'weather', label: '날씨' },
-  { value: 'overlay', label: '겹쳐보기' },
 ];
 
 const BODY_PART_OPTIONS = BODY_MAP_PARTS.map((value) => ({ value, label: BODY_PART_LABELS[value] }));
