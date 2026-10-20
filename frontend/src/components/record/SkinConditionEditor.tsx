@@ -70,7 +70,7 @@ export default function SkinConditionEditor({ value, onChange, painIndex }: Prop
                   aria-pressed={checked}
                   onClick={() => toggleSign(selected, sign)}
                   className={`rounded-full border px-3 py-1.5 text-base ${
-                    checked ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
+                    checked ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
                   {SKIN_SIGN_LABELS[sign]}

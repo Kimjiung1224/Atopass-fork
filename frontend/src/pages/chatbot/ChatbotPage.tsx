@@ -82,7 +82,7 @@ export default function ChatbotPage() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-[#f5f7fb]">
       <PageHeader
         title="오늘의 기록"
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}

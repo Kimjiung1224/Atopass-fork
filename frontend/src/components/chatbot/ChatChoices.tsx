@@ -130,7 +130,7 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
                   onClick={() => toggle(sign)}
                   disabled={disabled}
                   className={`min-h-11 rounded-xl border px-3 text-base ${
-                    selected ? 'border-emerald-600 bg-emerald-50 font-semibold text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
+                    selected ? 'border-brand-600 bg-brand-50 font-semibold text-brand-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
                   {SKIN_SIGN_LABELS[sign]}
@@ -178,7 +178,7 @@ function ChoiceButton({
   wide?: boolean;
 }) {
   const tone = primary
-    ? 'border-emerald-600 bg-emerald-600 font-semibold text-white'
+    ? 'border-brand-600 bg-brand-600 font-semibold text-white'
     : subtle
       ? 'border-gray-300 bg-white text-gray-500'
       : 'border-gray-300 bg-white text-gray-800';

@@ -1,5 +1,20 @@
 @import 'tailwindcss';
 
+/* 디자인 시스템 — 차분한 파스텔 블루 톤. 버튼/활성 탭/포인트는 전부 brand-*를 쓴다. */
+@theme {
+  --color-brand-50: #f2f6ff;
+  --color-brand-100: #e4ecfe;
+  --color-brand-200: #c9d9fd;
+  --color-brand-300: #a3bdfb;
+  --color-brand-400: #7a9cf6;
+  --color-brand-500: #5b84f0;
+  --color-brand-600: #4c74e0;
+  --color-brand-700: #3d5ec2;
+  --color-brand-800: #2f499a;
+
+  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 4px 16px rgba(17, 24, 39, 0.05);
+}
+
 /* 고령 사용자도 읽기 쉽도록 기본 글자 크기를 키운다 (프론트/백 정리: 큰 버튼, 쉬운 문구) */
 html {
   font-size: 17px;
@@ -8,6 +23,6 @@ html {
 body {
   font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   color: #111827;
-  background: #f9fafb;
+  background: #f5f7fb;
   word-break: keep-all;
 }
