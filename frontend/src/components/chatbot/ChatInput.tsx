@@ -49,7 +49,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
         rows={1}
         disabled={textLocked}
         placeholder={textLocked ? '위 선택지에서 골라 주세요' : '피부 상태를 말해 주세요'}
-        className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2 text-base focus:border-emerald-500 focus:outline-none disabled:bg-gray-100"
+        className="max-h-32 min-h-11 flex-1 resize-none rounded-2xl border border-gray-300 px-4 py-2 text-base focus:border-brand-500 focus:outline-none disabled:bg-gray-100"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) handleSubmit(e);
         }}
@@ -57,7 +57,7 @@ export default function ChatInput({ value, onChange, onSubmit, onAttachPhotos, d
       <button
         type="submit"
         disabled={!trimmed || disabled || textLocked}
-        className="shrink-0 rounded-full bg-emerald-600 px-4 py-2 text-base font-semibold text-white disabled:bg-gray-300"
+        className="shrink-0 rounded-full bg-brand-600 px-4 py-2 text-base font-semibold text-white disabled:bg-gray-300"
       >
         보내기
       </button>

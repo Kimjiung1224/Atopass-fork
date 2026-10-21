@@ -143,7 +143,7 @@ export default function AnalysisPage() {
     <>
       <PageHeader title="피부 변화" />
 
-      <div className="flex flex-col gap-4 px-4 pt-4">
+      <div className="flex flex-col gap-4 px-5 pt-4 pb-4">
         <SegmentedControl options={PERIODS} value={period} onChange={changePeriod} ariaLabel="기간" />
         {isVisitPeriod && lastVisit && (
           <p className="-mt-2 text-sm text-gray-500">
@@ -152,8 +152,12 @@ export default function AnalysisPage() {
           </p>
         )}
 
-        <section className="rounded-2xl border border-gray-200 p-4">
-          <div role="tablist" aria-label="그래프 종류" className="mb-4 flex gap-1 border-b border-gray-100">
+        <section className="rounded-3xl bg-white p-5 shadow-card">
+          <div
+            role="tablist"
+            aria-label="그래프 종류"
+            className="mb-4 flex gap-1 overflow-x-auto border-b border-gray-100"
+          >
             {TABS.map((t) => (
               <button
                 key={t.value}
@@ -161,8 +165,8 @@ export default function AnalysisPage() {
                 role="tab"
                 aria-selected={tab === t.value}
                 onClick={() => setTab(t.value)}
-                className={`-mb-px border-b-2 px-3 pb-2 font-bold ${
-                  tab === t.value ? 'border-emerald-600 text-emerald-700' : 'border-transparent text-gray-400'
+                className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 pb-2 font-bold ${
+                  tab === t.value ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-400'
                 }`}
               >
                 {t.label}
@@ -341,7 +345,7 @@ function ChipGroup<T extends string>({
             aria-checked={value === option.value}
             onClick={() => onChange(option.value)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium ${
-              value === option.value ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'
+              value === option.value ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600'
             }`}
           >
             {option.label}

@@ -68,7 +68,7 @@ export default function ChatChoices({ field, onChoose, disabled }: Props) {
           className="flex shrink-0 animate-[sheet-up_200ms_ease-out] flex-col items-center gap-1 rounded-t-2xl border-t border-gray-200 bg-gray-50 pb-3 pt-2 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
         >
           <span className="h-1.5 w-10 rounded-full bg-gray-300" aria-hidden />
-          <span className="text-base font-semibold text-emerald-700">{label} 고르기 ▲</span>
+          <span className="text-base font-semibold text-brand-700">{label} 고르기 ▲</span>
         </SheetHandle>
       )}
 
@@ -246,11 +246,11 @@ function ChoiceBody({ field, onChoose, disabled }: Props) {
                   onClick={() => toggle(sign)}
                   disabled={disabled}
                   className={`flex min-h-11 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left ${
-                    selected ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-gray-300 bg-white text-gray-700'
+                    selected ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-gray-300 bg-white text-gray-700'
                   }`}
                 >
                   <span className={`text-base ${selected ? 'font-semibold' : ''}`}>{SKIN_SIGN_LABELS[sign]}</span>
-                  <span className={`text-sm leading-snug ${selected ? 'text-emerald-700' : 'text-gray-500'}`}>
+                  <span className={`text-sm leading-snug ${selected ? 'text-brand-700' : 'text-gray-500'}`}>
                     {SKIN_SIGN_DESCRIPTIONS[sign]}
                   </span>
                 </button>
@@ -297,7 +297,7 @@ function ChoiceButton({
   wide?: boolean;
 }) {
   const tone = primary
-    ? 'border-emerald-600 bg-emerald-600 font-semibold text-white'
+    ? 'border-brand-600 bg-brand-600 font-semibold text-white'
     : subtle
       ? 'border-gray-300 bg-white text-gray-500'
       : 'border-gray-300 bg-white text-gray-800';
