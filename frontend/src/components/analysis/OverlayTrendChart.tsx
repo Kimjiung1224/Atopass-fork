@@ -70,6 +70,23 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
   const theme = isDark ? CHART_DARK : CHART;
   const painColor = isDark ? PAIN_COLOR.dark : PAIN_COLOR.light;
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // 범례를 누르면 그 지표만 또렷하게 보이고 나머지는 흐려진다. 다시 누르면 원래대로 돌아간다.
+  const [emphasis, setEmphasis] = useState<'pain' | AuxKey | null>(null);
+
+  const togglePainEmphasis = () => setEmphasis((prev) => (prev === 'pain' ? null : 'pain'));
+  // 꺼져 있던 지표를 누르면 켜고, 켜진 지표를 누르면 강조하고, 강조된 지표를 다시 누르면 끈다.
+  const cycleAux = (key: AuxKey) => {
+    if (active !== key) {
+      onToggle(key);
+      setEmphasis(null);
+    } else if (emphasis !== key) {
+      setEmphasis(key);
+    } else {
+      onToggle(key);
+      setEmphasis(null);
+    }
+  };
+  const dimmed = (key: 'pain' | AuxKey) => emphasis !== null && emphasis !== key;
 
   const auxByDate = Object.fromEntries(
     AUX_METRICS.map((m) => [m.key, new Map(aux[m.key].map((d) => [d.date, d.value]))]),
@@ -119,23 +136,33 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
       </div>
 
       <div role="group" aria-label="그래프에 겹쳐 볼 지표" className="flex flex-wrap gap-1.5">
-        <span className="flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:text-gray-100">
+        <button
+          type="button"
+          aria-pressed={emphasis === 'pain'}
+          onClick={togglePainEmphasis}
+          className={`flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-sm font-semibold text-gray-900 dark:bg-gray-800 dark:text-gray-100 ${
+            dimmed('pain') ? 'opacity-40' : ''
+          }`}
+          style={emphasis === 'pain' ? { boxShadow: `0 0 0 2px ${painColor}` } : undefined}
+        >
           <LineIcon color={painColor} />
           고통 지수
-        </span>
+        </button>
         {AUX_METRICS.map((m) => {
           const isOn = active === m.key;
+          const isEmphasized = emphasis === m.key;
           return (
             <button
               key={m.key}
               type="button"
               aria-pressed={isOn}
-              onClick={() => onToggle(m.key)}
+              onClick={() => cycleAux(m.key)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${
                 isOn
                   ? 'border-gray-300 text-gray-800 dark:border-gray-600 dark:text-gray-100'
                   : 'border-gray-200 text-gray-400 opacity-50 dark:border-gray-700 dark:text-gray-500'
-              }`}
+              } ${dimmed(m.key) ? 'opacity-40' : ''}`}
+              style={isEmphasized ? { boxShadow: `0 0 0 2px ${AUX_COLORS[m.key]}` } : undefined}
             >
               <LineIcon color={AUX_COLORS[m.key]} dashed />
               {m.label}
@@ -145,8 +172,8 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
       </div>
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
-        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 실제
-        값은 아래에서 볼 수 있어요.
+        왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 범례를
+        누르면 그 지표만 또렷하게 보여요. 실제 값은 아래에서 볼 수 있어요.
       </p>
 
       <div
@@ -177,8 +204,8 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
                 dataKey={m.key}
                 name={m.label}
                 stroke={AUX_COLORS[m.key]}
-                strokeWidth={1.5}
-                strokeOpacity={0.6}
+                strokeWidth={emphasis === m.key ? 2.5 : 1.5}
+                strokeOpacity={dimmed(m.key) ? 0.15 : emphasis === m.key ? 1 : 0.6}
                 strokeDasharray="4 3"
                 dot={false}
                 activeDot={false}
@@ -195,10 +222,11 @@ export default function OverlayTrendChart({ pain, aux, active, onToggle }: Props
               name="고통 지수"
               stroke={painColor}
               strokeWidth={3}
+              strokeOpacity={dimmed('pain') ? 0.25 : 1}
               fill={painColor}
-              fillOpacity={0.1}
+              fillOpacity={dimmed('pain') ? 0.03 : 0.1}
               connectNulls={false}
-              dot={{ r: data.length > 45 ? 1.5 : 2.5, fill: painColor, stroke: painColor, strokeWidth: 0 }}
+              dot={{ r: data.length > 45 ? 1.5 : 2.5, fill: painColor, stroke: painColor, strokeWidth: 0, fillOpacity: dimmed('pain') ? 0.25 : 1 }}
               activeDot={false}
               isAnimationActive={false}
             />
