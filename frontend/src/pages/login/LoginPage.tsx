@@ -103,7 +103,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center bg-[#f5f7fb] p-6">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center bg-[#f5f5f5] p-6">
       <div className="mb-8 text-center">
         <p className="text-3xl font-extrabold text-brand-600">Atopass</p>
         <p className="mt-2 text-gray-500">매일의 피부 기록을 쉽고 꾸준하게</p>
@@ -178,7 +178,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-2 rounded-xl bg-brand-600 py-3 text-lg font-bold text-white disabled:opacity-60"
+          className="mt-2 rounded-3xl bg-brand-600 py-3.5 text-lg font-bold text-white disabled:opacity-60"
         >
           {submitting ? '처리 중…' : isSignup ? '가입하고 시작하기' : '로그인'}
         </button>

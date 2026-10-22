@@ -38,6 +38,8 @@ export default function ChatbotPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   // 답할 때마다 늘려서 선택지를 새로 만든다 — 다음 질문의 선택지가 다시 아래에서 올라오게
   const [choiceRound, setChoiceRound] = useState(0);
+  // 선택지를 내려 두면 글로 답할 수 있고, 펼쳐 두면 선택지로만 답한다
+  const [choicesMinimized, setChoicesMinimized] = useState(false);
 
   const goToSummary = () => navigate(recordPath(recordDate));
 
@@ -47,7 +49,7 @@ export default function ChatbotPage() {
   const started = messages.length > 0;
   const choiceField: ChoiceField | null =
     !requiresConfirmation && askingField && askingField !== 'symptoms' ? askingField : null;
-  const textLocked = started && choiceField !== null && choiceField !== 'notes';
+  const textLocked = started && choiceField !== null && choiceField !== 'notes' && !choicesMinimized;
 
   // 기록이 저장되기 전에 붙여 둔 사진은, 저장되는 대로 그날 기록에 올린다 (저장된 뒤에 붙인 사진은 바로 올린다)
   const pendingPhotos = draft.photos;
@@ -82,7 +84,7 @@ export default function ChatbotPage() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-[#f5f7fb]">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-[#f5f5f5]">
       <PageHeader
         title="오늘의 기록"
         right={<span className="text-base text-gray-500">{formatKoreanDate(recordDate)}</span>}
@@ -114,6 +116,7 @@ export default function ChatbotPage() {
           key={`${choiceField}:${choiceRound}`}
           field={choiceField}
           onChoose={(c) => void handleChoose(c)}
+          onMinimizedChange={setChoicesMinimized}
         />
       )}
 

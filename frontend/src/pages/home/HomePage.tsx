@@ -94,7 +94,7 @@ export default function HomePage() {
                   </p>
                   <Link
                     to="/chatbot"
-                    className="mt-3 block rounded-2xl bg-brand-600 py-4 text-center text-lg font-bold text-white shadow-[0_8px_20px_rgba(76,116,224,0.28)]"
+                    className="mt-3 block rounded-3xl bg-brand-600 py-4 text-center text-lg font-bold text-white shadow-[0_8px_20px_rgba(76,116,224,0.28)]"
                   >
                     피부 상태 기록하기
                   </Link>
