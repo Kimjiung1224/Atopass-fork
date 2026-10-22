@@ -149,7 +149,7 @@ export default function ReportPage() {
           <button
             type="submit"
             disabled={submitting || !!rangeError}
-            className="rounded-xl bg-brand-600 py-4 text-lg font-bold text-white disabled:opacity-60"
+            className="rounded-3xl bg-brand-600 py-4 text-lg font-bold text-white disabled:opacity-60"
           >
             {submitting ? 'PDF 만드는 중…' : 'PDF 만들기'}
           </button>

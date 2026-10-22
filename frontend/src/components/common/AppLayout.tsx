@@ -78,11 +78,11 @@ const TABS = [
 
 export default function AppLayout() {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-[#f5f7fb] md:max-w-2xl lg:max-w-3xl">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-[#f5f5f5] md:max-w-2xl lg:max-w-3xl">
       <main className="flex-1 pb-24">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:max-w-2xl lg:max-w-3xl">
+      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-100 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)] backdrop-blur md:max-w-2xl lg:max-w-3xl">
         <ul className="grid grid-cols-5">
           {TABS.map((tab) => (
             <li key={tab.to}>
