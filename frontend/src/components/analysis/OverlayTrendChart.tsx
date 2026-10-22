@@ -99,7 +99,6 @@ export default function OverlayTrendChart({ pain, aux }: Props) {
     (best, d) => (d.value !== null && (best === null || d.value >= (best.value ?? -Infinity)) ? d : best),
     null,
   );
-  const painDays = painValues.filter((v) => v >= 1).length;
 
   const shownDate = selectedDate && pain.some((p) => p.date === selectedDate) ? selectedDate : (pain.at(-1)?.date ?? null);
   const shownPain = pain.find((p) => p.date === shownDate)?.value ?? null;
@@ -110,14 +109,13 @@ export default function OverlayTrendChart({ pain, aux }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <SummaryCard label="평균 고통 지수" value={painAverage === null ? '-' : painAverage.toFixed(1)} />
         <SummaryCard
           label="최고값"
           value={peak?.value != null ? String(peak.value) : '-'}
           sub={peak ? formatMonthDay(peak.date) : undefined}
         />
-        <SummaryCard label="통증 있는 날" value={`${painDays}일`} />
       </div>
 
       <div role="group" aria-label="강조해서 볼 지표" className="flex flex-wrap gap-1.5">

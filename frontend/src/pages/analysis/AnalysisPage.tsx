@@ -30,11 +30,11 @@ import { getErrorMessage } from '@/utils/errorMessage';
 import { bodyPartScoreOf } from '@/utils/recordScore';
 import { dDayLabel, daysUntil, visitCycle } from '@/utils/visit';
 
-type Period = '7' | '30' | 'VISIT';
+type Period = '14' | '30' | 'VISIT';
 type Tab = 'overlay' | 'bodyPart' | 'weather';
 
 const PERIODS: { value: Period; label: string }[] = [
-  { value: '7', label: '7일' },
+  { value: '14', label: '14일' },
   { value: '30', label: '30일' },
   { value: 'VISIT', label: '재진 사이' },
 ];
