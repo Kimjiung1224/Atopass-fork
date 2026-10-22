@@ -1,16 +1,24 @@
 package com.atopy.Atopass.domain.chatbot.service;
 
 import com.atopy.Atopass.domain.chatbot.dto.response.ChatDraftResponse;
+import com.atopy.Atopass.domain.record.dto.request.LifestyleRequest;
+import com.atopy.Atopass.domain.record.dto.request.RecordRequest;
+import com.atopy.Atopass.domain.record.dto.request.SkinConditionRequest;
+import com.atopy.Atopass.domain.record.dto.request.SymptomsRequest;
 import com.atopy.Atopass.domain.record.dto.response.LifestyleResponse;
 import com.atopy.Atopass.domain.record.dto.response.SkinConditionResponse;
 import com.atopy.Atopass.domain.record.dto.response.SymptomsResponse;
 import com.atopy.Atopass.domain.record.entity.BodyPart;
 import com.atopy.Atopass.domain.record.entity.OutdoorActivity;
+import com.atopy.Atopass.domain.record.entity.SkinCondition;
+import com.atopy.Atopass.domain.record.entity.SkinRecord;
 import com.atopy.Atopass.domain.record.entity.SkinSign;
 import com.atopy.Atopass.domain.record.entity.SleepScore;
 import com.atopy.Atopass.domain.record.entity.Symptom;
+import com.atopy.Atopass.domain.record.entity.SymptomScore;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -20,6 +28,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringJoiner;
+import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -29,20 +39,22 @@ import tools.jackson.databind.node.ObjectNode;
  * 챗봇이 대화로 모아 가는 기록 초안. 사용자가 말한 값만 담고, 말하지 않은 값은 비워 둔다.
  * 세션에는 JSON으로 저장된다. LLM이 준 값은 {@link #apply}에서 모두 검증한 뒤에만 반영한다.
  *
- * <p>챗봇이 묻는 항목: 고통 지수(필수), 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
- * 부위 기록(부위의 고통 점수와 그 부위에 나타난 증상)과 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
+ * <p>챗봇이 묻는 항목: 고통 지수(필수), 고통이 있는 부위, 수면 시간, 약 복용 여부, 나타난 증상, 특이사항.
+ * 고통 지수와 부위는 한 묶음이라, 고통 지수를 받으면 바로 이어서 부위를 묻는다(0점이면 묻지 않는다).
+ * 음주·야외활동은 묻지 않지만, 사용자가 먼저 말하면 함께 기록한다.
  * 지금 물어볼 항목은 {@link #askingField}로 서버가 정한다. 화면은 이 값에 맞춰 선택지를 보여 준다.
  */
 public final class ChatDraft {
 
 	/** 사용자가 "없어요/넘어갈게요"라고 답해 더 묻지 않을 선택 항목 */
+	static final String SKIP_BODY_PARTS = "bodyParts";
 	static final String SKIP_SLEEP = "sleepHours";
 	static final String SKIP_MEDICATION = "medication";
 	static final String SKIP_SKIN_SIGNS = "skinSigns";
 	static final String SKIP_LIFESTYLE = "lifestyle";
 	static final String SKIP_NOTES = "notes";
 	private static final Set<String> SKIPPABLE = Set.of(
-		SKIP_SLEEP, SKIP_MEDICATION, SKIP_SKIN_SIGNS, SKIP_LIFESTYLE, SKIP_NOTES);
+		SKIP_BODY_PARTS, SKIP_SLEEP, SKIP_MEDICATION, SKIP_SKIN_SIGNS, SKIP_LIFESTYLE, SKIP_NOTES);
 
 	private static final int MIN_SCORE = 0;
 	private static final int MAX_SCORE = 10;
@@ -71,9 +83,43 @@ public final class ChatDraft {
 	private final Set<String> skipped = new LinkedHashSet<>();
 	/** 챗봇이 부위나 증상 점수를 되물은 상태. 사용자가 글로 답해야 하므로 선택지 대신 입력창을 연다. */
 	private boolean followUp;
+	/** 이미 저장된 기록을 불러와 고치는 중. 빈 항목을 차례로 묻지 않고, 사용자가 바꿀 내용을 말하길 기다린다. */
+	private boolean editing;
 
 	public static ChatDraft empty() {
 		return new ChatDraft();
+	}
+
+	/**
+	 * 저장된 기록을 고치기 위한 초안. 기록에 없는 선택 항목은 건너뛴 것으로 두어 다시 묻지 않는다.
+	 * 기록의 하루 증상에는 부위 증상이 합쳐져 있으므로, 부위 증상을 빼고 직접 고른 증상만 남긴다.
+	 */
+	public static ChatDraft fromRecord(SkinRecord record) {
+		ChatDraft draft = new ChatDraft();
+		Set<SkinSign> partSigns = EnumSet.noneOf(SkinSign.class);
+		for (SkinCondition condition : record.getConditions()) {
+			Map<Symptom, Integer> scores = new EnumMap<>(Symptom.class);
+			for (SymptomScore score : condition.getScores()) {
+				scores.put(score.getSymptom(), score.getScore());
+			}
+			draft.conditions.put(condition.getBodyPart(), scores);
+			if (!condition.getSkinSigns().isEmpty()) {
+				draft.conditionSigns.put(condition.getBodyPart(), EnumSet.copyOf(condition.getSkinSigns()));
+				partSigns.addAll(condition.getSkinSigns());
+			}
+		}
+		draft.painIndex = record.getPainIndex();
+		draft.sleepHours = record.getSleepHours();
+		draft.medication = record.getMedication();
+		Set<SkinSign> dailySigns = EnumSet.noneOf(SkinSign.class);
+		record.getSkinSigns().stream().filter(sign -> !partSigns.contains(sign)).forEach(dailySigns::add);
+		draft.skinSigns = dailySigns;
+		draft.alcohol = record.getAlcohol();
+		draft.outdoorActivity = record.getOutdoorActivity();
+		draft.notes = record.getNotes();
+		draft.skipped.addAll(SKIPPABLE);
+		draft.editing = true;
+		return draft;
 	}
 
 	// ── 저장·복원 ──
@@ -116,6 +162,9 @@ public final class ChatDraft {
 		skipped.forEach(skippedNode::add);
 		if (followUp) {
 			root.put("followUp", true);
+		}
+		if (editing) {
+			root.put("editing", true);
 		}
 		return mapper.writeValueAsString(root);
 	}
@@ -173,6 +222,7 @@ public final class ChatDraft {
 				}
 			}
 			draft.followUp = root.path("followUp").asBoolean(false);
+			draft.editing = root.path("editing").asBoolean(false);
 		} catch (RuntimeException e) {
 			return new ChatDraft();
 		}
@@ -315,6 +365,42 @@ public final class ChatDraft {
 			next.notes = text.isEmpty() ? null : text;
 		}
 
+		// 저장된 기록을 고칠 때 "가려움은 없어졌어요", "얼굴은 빼 주세요"처럼 지우는 말을 받는다.
+		JsonNode removeSigns = updates.path("removeSkinSigns");
+		if (present(removeSigns)) {
+			if (!removeSigns.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			for (JsonNode item : removeSigns) {
+				SkinSign sign;
+				try {
+					sign = SkinSign.valueOf(item.asString().trim().toUpperCase(Locale.ROOT));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				if (next.skinSigns != null) {
+					next.skinSigns.remove(sign);
+				}
+				next.conditionSigns.values().forEach(signsOfPart -> signsOfPart.remove(sign));
+			}
+		}
+		JsonNode removeParts = updates.path("removeBodyParts");
+		if (present(removeParts)) {
+			if (!removeParts.isArray()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			for (JsonNode item : removeParts) {
+				BodyPart part;
+				try {
+					part = BodyPart.valueOf(item.asString().trim().toUpperCase(Locale.ROOT));
+				} catch (IllegalArgumentException e) {
+					return ApplyResult.INVALID_VALUE;
+				}
+				next.conditions.remove(part);
+				next.conditionSigns.remove(part);
+			}
+		}
+
 		JsonNode skippedNode = updates.path("skipped");
 		if (skippedNode.isArray()) {
 			for (JsonNode item : skippedNode) {
@@ -331,6 +417,35 @@ public final class ChatDraft {
 	/** "넘어갈게요"로 건너뛸 수 있는 항목인지 */
 	static boolean skippable(String field) {
 		return SKIPPABLE.contains(field);
+	}
+
+	/** 저장된 기록을 고치는 중인지 */
+	public boolean editing() {
+		return editing;
+	}
+
+	/** 기록을 저장했으므로 이제부터는 빈 항목을 묻지 않고 고칠 내용을 받는다. */
+	void startEditing() {
+		this.editing = true;
+		skipped.addAll(SKIPPABLE);
+	}
+
+	/** 기록 내용(초안 값)이 같은지. 진행 상태(건너뜀·되묻기)는 비교하지 않는다. */
+	boolean sameContent(ChatDraft other) {
+		return toResponse().equals(other.toResponse());
+	}
+
+	/** 일반 기록 저장과 같은 형식으로 바꾼다. */
+	public RecordRequest toRecordRequest(LocalDate recordDate) {
+		List<SkinConditionRequest> list = conditions.entrySet().stream()
+			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
+			.map(e -> new SkinConditionRequest(e.getKey(), new SymptomsRequest(e.getValue().get(Symptom.PAIN)),
+				List.copyOf(conditionSigns.getOrDefault(e.getKey(), EnumSet.noneOf(SkinSign.class)))))
+			.toList();
+		LifestyleRequest lifestyle = alcohol == null && outdoorActivity == null
+			? null : new LifestyleRequest(alcohol, outdoorActivity);
+		return new RecordRequest(recordDate, list, painIndex, sleepHours, medication,
+			skinSigns == null ? List.of() : List.copyOf(skinSigns), lifestyle, notes);
 	}
 
 	/** 이번 응답이 부위나 증상 점수를 되묻는 질문인지 기록한다. 다음 턴이 성공하면 다시 정해진다. */
@@ -404,6 +519,31 @@ public final class ChatDraft {
 		return ApplyResult.OK;
 	}
 
+	/**
+	 * 고통 지수 다음에 고른 부위를 반영한다. 고통 지수와 부위는 한 묶음이라, 고른 부위마다 고통 지수를 그 부위의 고통 점수로 넣는다.
+	 * 고통 지수가 없거나 부위 이름이 하나라도 틀리면 아무것도 반영하지 않는다.
+	 */
+	ApplyResult applyBodyParts(JsonNode parts) {
+		if (painIndex == null || parts == null || !parts.isArray() || parts.isEmpty()) {
+			return ApplyResult.INVALID_VALUE;
+		}
+		ChatDraft next = copy();
+		for (JsonNode part : parts) {
+			if (!part.isString()) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			BodyPart bodyPart;
+			try {
+				bodyPart = BodyPart.valueOf(part.asString().trim().toUpperCase(Locale.ROOT));
+			} catch (IllegalArgumentException e) {
+				return ApplyResult.INVALID_VALUE;
+			}
+			next.conditions.computeIfAbsent(bodyPart, k -> new EnumMap<>(Symptom.class)).put(Symptom.PAIN, painIndex);
+		}
+		commit(next);
+		return ApplyResult.OK;
+	}
+
 	// ── 진행 상황 ──
 
 	/**
@@ -429,6 +569,11 @@ public final class ChatDraft {
 
 	private List<String> pendingOptionalFields() {
 		List<String> pending = new ArrayList<>();
+		// 고통이 없으면(0점) 부위는 묻지 않는다. 사용자가 이미 부위를 말했으면 다시 묻지 않는다.
+		boolean painful = painIndex == null || painIndex > MIN_PAIN_INDEX;
+		if (painful && conditions.isEmpty() && !skipped.contains(SKIP_BODY_PARTS)) {
+			pending.add("bodyParts");
+		}
 		if (sleepHours == null && !skipped.contains(SKIP_SLEEP)) {
 			pending.add("sleepHours");
 		}
@@ -480,6 +625,45 @@ public final class ChatDraft {
 			notes);
 	}
 
+	/** 사람이 읽는 초안 요약. 기록된 항목만 한 줄씩 보여 준다. (예: "- 고통 지수: 6점") */
+	public String summary() {
+		StringJoiner lines = new StringJoiner("\n");
+		if (painIndex != null) {
+			lines.add("- 고통 지수: " + painIndex + "점");
+		}
+		conditions.entrySet().stream()
+			.sorted(Map.Entry.comparingByKey(Comparator.comparingInt(Enum::ordinal)))
+			.forEach(e -> {
+				Integer pain = e.getValue().get(Symptom.PAIN);
+				Set<SkinSign> signs = conditionSigns.getOrDefault(e.getKey(), Set.of());
+				StringBuilder line = new StringBuilder("- " + e.getKey().label());
+				if (pain != null) {
+					line.append(": 고통 ").append(pain).append("점");
+				}
+				if (!signs.isEmpty()) {
+					line.append(pain != null ? ", " : ": ").append(labels(signs));
+				}
+				lines.add(line);
+			});
+		if (sleepHours != null) {
+			lines.add("- 수면 시간: " + sleepHours.stripTrailingZeros().toPlainString() + "시간");
+		}
+		if (medication != null) {
+			lines.add("- 약 복용: " + (medication ? "예" : "아니오"));
+		}
+		if (skinSigns != null) {
+			lines.add("- 나타난 증상: " + (skinSigns.isEmpty() ? "없음" : labels(skinSigns)));
+		}
+		if (notes != null) {
+			lines.add("- 특이사항: " + notes);
+		}
+		return lines.toString();
+	}
+
+	private static String labels(Set<SkinSign> signs) {
+		return signs.stream().sorted().map(SkinSign::label).collect(Collectors.joining(", "));
+	}
+
 	/** LLM에게 현재 초안을 알려 주기 위한 사람이 읽는 JSON */
 	public String toPromptJson(JsonMapper mapper) {
 		return toJson(mapper);
@@ -507,6 +691,7 @@ public final class ChatDraft {
 		copy.notes = notes;
 		copy.skipped.addAll(skipped);
 		copy.followUp = followUp;
+		copy.editing = editing;
 		return copy;
 	}
 
@@ -525,6 +710,7 @@ public final class ChatDraft {
 		skipped.clear();
 		skipped.addAll(next.skipped);
 		followUp = next.followUp;
+		editing = next.editing;
 	}
 
 }

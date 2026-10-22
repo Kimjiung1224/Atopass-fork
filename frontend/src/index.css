@@ -1,5 +1,23 @@
 @import 'tailwindcss';
 
+/* 디자인 시스템 — 차분한 파스텔 블루 톤. 버튼/활성 탭/포인트는 전부 brand-*를 쓴다. */
+@theme {
+  --color-brand-50: #f2f6ff;
+  --color-brand-100: #e4ecfe;
+  --color-brand-200: #c9d9fd;
+  --color-brand-300: #a3bdfb;
+  --color-brand-400: #7a9cf6;
+  --color-brand-500: #5b84f0;
+  --color-brand-600: #4c74e0;
+  --color-brand-700: #3d5ec2;
+  --color-brand-800: #2f499a;
+
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+}
+
+/* 어두운 화면은 html에 dark 클래스를 붙였을 때만 쓴다 (OS 설정을 따르면 아직 밝은 색뿐인 화면과 섞인다) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* 고령 사용자도 읽기 쉽도록 기본 글자 크기를 키운다 (프론트/백 정리: 큰 버튼, 쉬운 문구) */
 html {
   font-size: 17px;
@@ -8,6 +26,31 @@ html {
 body {
   font-family: 'Pretendard', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   color: #111827;
-  background: #f9fafb;
+  background: #f5f5f5;
   word-break: keep-all;
+}
+
+/* 챗봇 선택지: 질문이 오면 아래에서 올라오고, 답하면 아래로 내려간다 */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*='animate-[sheet-'] {
+    animation-duration: 1ms !important;
+  }
 }

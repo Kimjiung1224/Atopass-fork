@@ -6,11 +6,10 @@ import PageHeader from '@/components/common/PageHeader';
 import { ErrorMessage, LoadingMessage } from '@/components/common/StatusMessage';
 import ComparisonView from '@/components/record/ComparisonView';
 import { useAsync } from '@/hooks/useAsync';
-import { toDateString, today } from '@/utils/date';
+import { monthCells, monthRange, WEEKDAYS } from '@/utils/calendar';
+import { today } from '@/utils/date';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { recordPath } from '@/utils/routes';
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 고통 지수 구간별 표시 색 */
 const SCORE_LEVELS = [
@@ -19,21 +18,6 @@ const SCORE_LEVELS = [
   { max: 10, label: '7~10점', className: 'bg-red-500' },
 ];
 const scoreColor = (score: number) => SCORE_LEVELS.find((level) => score <= level.max)!.className;
-
-/** 해당 달의 1일 ~ 말일 (yyyy-MM-dd) */
-function monthRange(year: number, month: number) {
-  return { startDate: toDateString(new Date(year, month, 1)), endDate: toDateString(new Date(year, month + 1, 0)) };
-}
-
-/** 달력 칸: 앞쪽 빈칸(null) + 1일부터 말일까지 */
-function monthCells(year: number, month: number): (string | null)[] {
-  const blanks = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  return [
-    ...Array<null>(blanks).fill(null),
-    ...Array.from({ length: days }, (_, i) => toDateString(new Date(year, month, i + 1))),
-  ];
-}
 
 /**
  * 캘린더 — /calendar. 월별 기록 여부와 대표 점수를 보여 주고, 날짜를 누르면 그날 기록으로 이동한다.
@@ -87,8 +71,8 @@ export default function CalendarPage() {
     <>
       <PageHeader title="캘린더" />
 
-      <div className="flex flex-col gap-4 px-4 pt-4">
-        <div className="flex items-center justify-between gap-3 rounded-2xl bg-gray-50 px-4 py-3">
+      <div className="flex flex-col gap-4 px-5 pt-4 pb-4">
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 shadow-card">
           <p className="text-sm text-gray-600">
             {comparing
               ? picked.length < 2
@@ -101,7 +85,7 @@ export default function CalendarPage() {
             onClick={toggleComparing}
             aria-pressed={comparing}
             className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold ${
-              comparing ? 'bg-gray-800 text-white' : 'border border-gray-300 bg-white text-gray-700'
+              comparing ? 'bg-brand-600 text-white' : 'border border-gray-200 bg-white text-gray-700'
             }`}
           >
             {comparing ? '비교 끝내기' : '날짜 비교'}
@@ -134,7 +118,10 @@ export default function CalendarPage() {
         {records.error ? (
           <ErrorMessage message={getErrorMessage(records.error)} onRetry={records.reload} />
         ) : (
-          <div className={records.loading ? 'opacity-50' : undefined} aria-busy={records.loading}>
+          <div
+            className={`rounded-3xl bg-white p-3 shadow-card ${records.loading ? 'opacity-50' : ''}`}
+            aria-busy={records.loading}
+          >
             <ol className="grid grid-cols-7 text-center text-sm text-gray-500">
               {WEEKDAYS.map((day, i) => (
                 <li key={day} className={`py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : ''}`}>
@@ -160,8 +147,8 @@ export default function CalendarPage() {
                       aria-pressed={comparing ? tag !== null : undefined}
                       aria-label={`${view.month + 1}월 ${day}일${record ? `, 기록 있음${score === null ? '' : `, 최고 ${score}점`}` : ''}${tag ? `, 비교 ${tag}` : ''}`}
                       className={`relative flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-xl text-base ${
-                        isToday ? 'border-2 border-emerald-600 font-bold' : ''
-                      } ${tag ? 'bg-gray-800 text-white' : isFuture ? 'text-gray-300' : 'hover:bg-gray-50'}`}
+                        isToday ? 'border-2 border-brand-600 font-bold' : ''
+                      } ${tag ? 'bg-brand-600 text-white' : isFuture ? 'text-gray-300' : 'hover:bg-brand-50'}`}
                     >
                       {tag && <span className="absolute left-1 top-0.5 text-[10px] font-bold">{tag}</span>}
                       {day}
@@ -190,7 +177,7 @@ export default function CalendarPage() {
           </section>
         )}
 
-        <section className="rounded-2xl border border-gray-200 p-4 text-sm text-gray-600">
+        <section className="rounded-2xl bg-white p-4 text-sm text-gray-600 shadow-card">
           <p className="mb-2">
             이번 달 기록 <span className="font-bold text-gray-900">{records.data?.length ?? 0}일</span>
           </p>

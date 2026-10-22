@@ -1,4 +1,4 @@
-import type { RecordInput, SkinSign } from './record';
+import type { BodyPart, RecordInput, SkinSign } from './record';
 
 export type ChatMode = 'RECORD' | 'QUERY';
 
@@ -8,7 +8,7 @@ export interface ChatSession {
 }
 
 /** 아직 입력되지 않은 항목 */
-export type PendingField = 'painIndex' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
+export type PendingField = 'painIndex' | 'bodyParts' | 'symptoms' | 'sleepHours' | 'medication' | 'skinSigns' | 'notes';
 
 /** 선택지로 답하는 항목. 특이사항은 글로 받고 "없어요"만 선택지로 고른다 */
 export type ChoiceField = Exclude<PendingField, 'symptoms'>;
@@ -24,10 +24,14 @@ export interface SendMessageResponse {
   pendingFields: PendingField[];
   /** 지금 묻는 항목 — 이 값에 맞춰 선택지를 보여 준다. symptoms(부위·증상 점수)는 글로 답한다. 확인 단계면 null */
   askingField: PendingField | null;
-  /** true면 일일 총정리(확인) 단계로 이동 */
+  /** true면 물어볼 항목이 끝나 그날 기록이 저장됨 (일일 총정리와 인사가 reply로 온다) */
   requiresConfirmation: boolean;
   /** 지금까지 모은 초안. 질의 모드에서는 null */
   draft: ChatDraft | null;
+  /** 그날 기록이 이미 저장되어, 이제 글로 고치면 바로 저장되는 대화 */
+  editing: boolean;
+  /** 이 대화로 저장한(또는 고치는) 기록. 아직 저장 전이면 null */
+  recordId: number | null;
 }
 
 /** GET /chatbot/sessions/{sessionId}/draft — 저장된(닫힌) 세션이면 409 SESSION_CLOSED */
@@ -36,6 +40,8 @@ export interface ChatDraftState {
   pendingFields: PendingField[];
   askingField: PendingField | null;
   requiresConfirmation: boolean;
+  editing: boolean;
+  recordId: number | null;
 }
 
 /**
@@ -44,11 +50,13 @@ export interface ChatDraftState {
  */
 export type ChatChoiceRequest =
   | { field: 'painIndex'; value: number }
+  /** 고통이 있는 부위. 고른 부위마다 방금 받은 고통 지수가 그 부위의 점수가 된다 */
+  | { field: 'bodyParts'; value: BodyPart[] }
   | { field: 'sleepHours'; value: number }
   | { field: 'medication'; value: boolean }
   /** 빈 배열이면 "증상 없음" */
   | { field: 'skinSigns'; value: SkinSign[] }
-  /** 넘어가기. 특이사항은 "없어요" */
+  /** 넘어가기. 부위·특이사항은 "없어요" */
   | { field: Exclude<ChoiceField, 'painIndex'>; skip: true };
 
 /** GET·POST /chatbot/consent */

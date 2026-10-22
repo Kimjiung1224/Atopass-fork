@@ -39,7 +39,11 @@ public enum ErrorCode {
 
 	// 보고서
 	REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 보고서를 찾을 수 없습니다."),
-	NO_RECORDS_IN_PERIOD(HttpStatus.BAD_REQUEST, "선택한 기간에 기록이 없습니다.");
+	NO_RECORDS_IN_PERIOD(HttpStatus.BAD_REQUEST, "선택한 기간에 기록이 없습니다."),
+
+	// 재진 날짜
+	VISIT_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 재진 날짜를 찾을 수 없습니다."),
+	VISIT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 기록한 재진 날짜입니다.");
 
 	private final HttpStatus status;
 	private final String message;

@@ -134,7 +134,7 @@ function DayHeader({ tag, date, day }: { tag: 'A' | 'B'; date: string; day: Comp
       </p>
       <p className="mt-1 font-bold">{formatKoreanDate(date)}</p>
       {day && (
-        <Link to={recordPath(date)} className="mt-1 inline-block text-sm text-emerald-700 underline">
+        <Link to={recordPath(date)} className="mt-1 inline-block text-sm text-brand-700 underline">
           그날 기록 보기
         </Link>
       )}

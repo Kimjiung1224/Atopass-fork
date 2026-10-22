@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
 /**
  * 챗봇 대화 세션. 날짜 하나당 하나이며, 기록을 저장(확정)하면 닫힌다.
  * draft에는 확정 전 기록 초안(JSON)을 보관한다.
+ * 그날 기록이 이미 있으면 그 기록을 초안으로 불러온 수정 세션(editingRecordId)으로 연다.
  */
 @Getter
 @Entity
@@ -60,12 +61,23 @@ public class ChatSession extends BaseTimeEntity {
 	@Column(nullable = false)
 	private boolean closed;
 
+	/** 이미 저장된 그날 기록을 고치는 대화이면 그 기록의 ID. 저장하면 새로 만들지 않고 이 기록을 수정한다. */
+	private Long editingRecordId;
+
 	public static ChatSession open(Member member, LocalDate recordDate, ChatMode mode) {
 		ChatSession session = new ChatSession();
 		session.id = UUID.randomUUID().toString();
 		session.member = member;
 		session.recordDate = recordDate;
 		session.mode = mode;
+		return session;
+	}
+
+	/** 이미 저장된 기록을 초안으로 불러와 고치는 세션 */
+	public static ChatSession openForEdit(Member member, LocalDate recordDate, Long recordId, String draft) {
+		ChatSession session = open(member, recordDate, ChatMode.RECORD);
+		session.editingRecordId = recordId;
+		session.draft = draft;
 		return session;
 	}
 
@@ -77,6 +89,16 @@ public class ChatSession extends BaseTimeEntity {
 
 	public void close() {
 		this.closed = true;
+	}
+
+	/** 저장 뒤에도 그날 대화를 이어 가도록 다시 연다. */
+	public void reopen() {
+		this.closed = false;
+	}
+
+	/** 이 대화로 만든(또는 고치는) 기록. 이후 저장은 이 기록을 수정한다. */
+	public void startEditing(Long recordId) {
+		this.editingRecordId = recordId;
 	}
 
 }

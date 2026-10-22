@@ -78,11 +78,11 @@ const TABS = [
 
 export default function AppLayout() {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-white">
-      <main className="flex-1 pb-20">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-[#f5f5f5] md:max-w-2xl lg:max-w-3xl">
+      <main className="flex-1 pb-24">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-200 bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 mx-auto max-w-md border-t border-gray-100 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)] backdrop-blur md:max-w-2xl lg:max-w-3xl">
         <ul className="grid grid-cols-5">
           {TABS.map((tab) => (
             <li key={tab.to}>
@@ -90,7 +90,7 @@ export default function AppLayout() {
                 to={tab.to}
                 end={tab.end}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-0.5 py-2 text-sm ${isActive ? 'font-bold text-emerald-600' : 'text-gray-500'}`
+                  `flex flex-col items-center gap-0.5 py-2.5 text-sm ${isActive ? 'font-bold text-brand-600' : 'text-gray-400'}`
                 }
               >
                 <TabIcon>{tab.icon}</TabIcon>
