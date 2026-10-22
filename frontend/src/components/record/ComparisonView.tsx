@@ -224,8 +224,8 @@ function DayTag({ tag }: { tag: 'A' | 'B' }) {
 }
 
 /**
- * 한 줄: 항목 이름 / A 값 / B 값. 둘 다 점수(scoreA·scoreB)면 높은 쪽을 색으로 칠하고 ▲를 붙여 어느 날이 더 높은지 바로 보이게 하고,
- * 아래에 차이를 적는다. 고통처럼 높을수록 나쁜 점수는 빨강, 수면 점수처럼 높을수록 좋은 점수(higherIsBetter)는 초록이다.
+ * 한 줄: 항목 이름 / A 값 / B 값. 둘 다 점수(scoreA·scoreB)이고 다르면 높은 쪽을 색으로 칠하고 ▲를 붙여 어느 날이 더 높은지 바로 보이게 하고,
+ * A·B 칸 아래에 차이를 적는다. 고통처럼 높을수록 나쁜 점수는 빨강, 수면 점수처럼 높을수록 좋은 점수(higherIsBetter)는 초록이다.
  */
 function CompareRow({
   label,
@@ -255,9 +255,12 @@ function CompareRow({
         <Value text={valueA} highlight={higher === 'A' ? tone : null} />
         <Value text={valueB} highlight={higher === 'B' ? tone : null} />
       </div>
-      {compared && (
-        <p className="mt-1 text-center text-xs text-gray-500">
-          {higher ? `${higher}가 ${gap}점 더 높아요` : '두 날이 같아요'}
+      {higher && (
+        <p className={`${ROW_GRID} mt-0.5 text-xs text-gray-500`}>
+          <span />
+          <span className="col-span-2 text-center">
+            {higher}가 {gap}점 더 높아요
+          </span>
         </p>
       )}
     </div>
