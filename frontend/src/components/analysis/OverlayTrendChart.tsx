@@ -37,6 +37,8 @@ interface Props {
   /** 날짜별 고통 지수. 기록 없는 날은 null. 이 날짜들이 그래프의 가로축이 된다 */
   pain: DailyValue[];
   aux: Record<AuxKey, DailyValue[]>;
+  /** 그래프에서 날짜를 눌렀을 때 */
+  onDateClick?: (date: string) => void;
 }
 
 const round = (v: number, digits: number) => Number(v.toFixed(digits));
@@ -60,9 +62,9 @@ function normalizer(data: DailyValue[], swing: number) {
 /**
  * '전체' 탭 그래프. 고통 지수(0~10)를 굵은 빨간 선으로 크게 그리고,
  * 보조 지표(수면 시간·기온·습도)는 처음부터 모두, 기간 평균을 가운데에 두고 보이지 않는 보조 축에 얇은 점선으로 겹친다.
- * 그래프를 누르거나 마우스를 올린 날의 실제 값은 그래프 아래에 보여 준다(기본 툴팁 대신).
+ * 마우스를 올린 날의 실제 값은 그래프 아래에 보여 주고(기본 툴팁 대신), 날짜를 누르면 onDateClick으로 알린다.
  */
-export default function OverlayTrendChart({ pain, aux }: Props) {
+export default function OverlayTrendChart({ pain, aux, onDateClick }: Props) {
   const isDark = useIsDark();
   const theme = isDark ? CHART_DARK : CHART;
   const painColor = isDark ? PAIN_COLOR.dark : PAIN_COLOR.light;
@@ -105,6 +107,10 @@ export default function OverlayTrendChart({ pain, aux }: Props) {
 
   const pick = (state: { activeLabel?: unknown } | null | undefined) => {
     if (typeof state?.activeLabel === 'string') setSelectedDate(state.activeLabel);
+  };
+  const click = (state: { activeLabel?: unknown } | null | undefined) => {
+    pick(state);
+    if (typeof state?.activeLabel === 'string') onDateClick?.(state.activeLabel);
   };
 
   return (
@@ -153,16 +159,16 @@ export default function OverlayTrendChart({ pain, aux }: Props) {
 
       <p className="text-sm text-gray-400 dark:text-gray-400">
         왼쪽 눈금은 고통 지수(0–10)예요. 점선 지표는 기간 평균을 가운데에 두고, 평균보다 높으면 위·낮으면 아래로 그렸어요. 범례를
-        누르면 그 지표만 또렷하게 보이고, 다시 누르면 모두 함께 보여요. 실제 값은 아래에서 볼 수 있어요.
+        누르면 그 지표만 또렷하게 보이고, 다시 누르면 모두 함께 보여요. 날짜를 누르면 그날 기록으로 넘어가요.
       </p>
 
       <div
-        className="h-64 [&_*:focus:not(:focus-visible)]:outline-none"
+        className={`h-64 [&_*:focus:not(:focus-visible)]:outline-none ${onDateClick ? 'cursor-pointer' : ''}`}
         role="img"
         aria-label="고통 지수와 수면 시간·기온·습도를 겹친 변화 그래프"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -20 }} onMouseMove={pick} onClick={pick}>
+          <ComposedChart data={data} margin={{ top: 12, right: 12, bottom: 0, left: -20 }} onMouseMove={pick} onClick={click}>
             <CartesianGrid vertical={false} stroke={theme.grid} />
             <XAxis dataKey="date" tickFormatter={formatMonthDay} tickLine={false} axisLine={false} minTickGap={24} tick={theme.tick} />
             <YAxis

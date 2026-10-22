@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
 import { visitApi } from '@/apis/visit';
@@ -54,6 +55,7 @@ function toDailySeries(items: TrendDatum[], startDate: string, endDate: string) 
 export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overlay');
+  const navigate = useNavigate();
 
   const visits = useAsync(visitApi.getList, []);
   const { lastVisit, nextVisit } = visitCycle(visits.data ?? [], today());
@@ -92,6 +94,10 @@ export default function AnalysisPage() {
     }));
     return toDailySeries(items, range.startDate, range.endDate);
   }, [records.data, range]);
+  // 그래프에서 기록이 있는 날을 누르면 그날 기록 화면으로 넘어간다.
+  const openRecord = (date: string) => {
+    if (records.data?.some((r) => r.recordDate === date)) navigate(`/record/${date}`);
+  };
   const overlaySleepSeries = useMemo(() => {
     if (!range) return [];
     const items = (records.data ?? []).map((r) => ({ date: r.recordDate, value: r.sleepHours ?? null, recordId: r.recordId }));
@@ -165,6 +171,7 @@ export default function AnalysisPage() {
                 key={period}
                 pain={overlayScoreSeries}
                 aux={{ sleep: overlaySleepSeries, temperature: temperatureSeries, humidity: humiditySeries }}
+                onDateClick={openRecord}
               />
             )
           ) : (
