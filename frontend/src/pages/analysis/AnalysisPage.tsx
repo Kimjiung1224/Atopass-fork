@@ -3,7 +3,7 @@ import { analysisApi } from '@/apis/analysis';
 import { getAllRecords } from '@/apis/recordList';
 import { visitApi } from '@/apis/visit';
 import { getHistoricalWeather } from '@/apis/weather';
-import OverlayTrendChart, { type AuxKey } from '@/components/analysis/OverlayTrendChart';
+import OverlayTrendChart from '@/components/analysis/OverlayTrendChart';
 import PeriodInsights from '@/components/analysis/PeriodInsights';
 import SelectedDayRecord from '@/components/analysis/SelectedDayRecord';
 import TrendLineChart, { type TrendDatum } from '@/components/analysis/TrendLineChart';
@@ -66,8 +66,6 @@ export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overlay');
   const [bodyPart, setBodyPart] = useState<BodyPart>('FACE');
-  // '전체' 탭에서 고통 지수 위에 겹쳐 볼 보조 지표. 한 번에 하나만 겹치고, 처음에는 고통 지수만 보여 준다.
-  const [overlayKey, setOverlayKey] = useState<AuxKey | null>(null);
   // 그래프에서 누른 날. 화면을 옮기지 않고 그래프 아래에 그날 기록을 보여 준다.
   const [selected, setSelected] = useState<{ date: string; recordId: number } | null>(null);
 
@@ -126,9 +124,6 @@ export default function AnalysisPage() {
     const items = (records.data ?? []).map((r) => ({ date: r.recordDate, value: r.sleepHours ?? null, recordId: r.recordId }));
     return toDailySeries(items, range.startDate, range.endDate);
   }, [records.data, range]);
-
-  // 다른 지표를 누르면 그 지표로 바꾸고, 켜진 지표를 다시 누르면 끈다.
-  const toggleOverlayKey = (key: AuxKey) => setOverlayKey((prev) => (prev === key ? null : key));
 
   const selectDay = (datum: TrendDatum) => {
     if (datum.recordId !== null) setSelected({ date: datum.date, recordId: datum.recordId });
@@ -212,8 +207,6 @@ export default function AnalysisPage() {
                 key={period}
                 pain={overlayScoreSeries}
                 aux={{ sleep: overlaySleepSeries, temperature: temperatureSeries, humidity: humiditySeries }}
-                active={overlayKey}
-                onToggle={toggleOverlayKey}
               />
             )
           ) : isWeatherTab ? (
