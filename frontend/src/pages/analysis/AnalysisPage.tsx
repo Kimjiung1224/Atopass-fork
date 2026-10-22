@@ -23,13 +23,15 @@ import { eachDay, lastNDaysRange } from '@/utils/dateRange';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { dDayLabel, daysUntil, visitCycle } from '@/utils/visit';
 
-type Period = '14' | '30' | 'VISIT';
+type Period = '14' | '30' | 'VISIT' | 'CUSTOM';
+type DateRange = { startDate: string; endDate: string };
 type Tab = 'overlay' | 'weather';
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: '14', label: '14일' },
   { value: '30', label: '30일' },
   { value: 'VISIT', label: '재진 사이' },
+  { value: 'CUSTOM', label: '직접 선택' },
 ];
 
 const TABS: { value: Tab; label: string }[] = [
@@ -39,10 +41,14 @@ const TABS: { value: Tab; label: string }[] = [
 
 /**
  * 기간 필터를 날짜로 변환한다. '재진 사이'는 지난 재진 날부터 오늘까지(다음 재진 전까지 쌓인 기록)이고,
- * 지난 재진을 기록하지 않았으면 null이다.
+ * 지난 재진을 기록하지 않았으면 null이다. '직접 선택'은 고른 시작일~종료일이고, 순서가 맞지 않으면 null이다.
  */
-function periodToRange(period: Period, lastVisit: string | null) {
+function periodToRange(period: Period, lastVisit: string | null, custom: DateRange) {
   if (period === 'VISIT') return lastVisit ? { startDate: lastVisit, endDate: today() } : null;
+  if (period === 'CUSTOM') {
+    const valid = custom.startDate && custom.endDate && custom.startDate <= custom.endDate && custom.endDate <= today();
+    return valid ? custom : null;
+  }
   return lastNDaysRange(Number(period));
 }
 
@@ -55,12 +61,15 @@ function toDailySeries(items: TrendDatum[], startDate: string, endDate: string) 
 export default function AnalysisPage() {
   const [period, setPeriod] = useState<Period>('30');
   const [tab, setTab] = useState<Tab>('overlay');
+  // '직접 선택' 기간. 처음에는 최근 30일로 채워 둔다.
+  const [custom, setCustom] = useState<DateRange>(() => lastNDaysRange(30));
   const navigate = useNavigate();
 
   const visits = useAsync(visitApi.getList, []);
   const { lastVisit, nextVisit } = visitCycle(visits.data ?? [], today());
-  const range = useMemo(() => periodToRange(period, lastVisit), [period, lastVisit]);
+  const range = useMemo(() => periodToRange(period, lastVisit, custom), [period, lastVisit, custom]);
   const isVisitPeriod = period === 'VISIT';
+  const isCustomPeriod = period === 'CUSTOM';
   const isWeatherTab = tab === 'weather';
   const isOverlayTab = tab === 'overlay';
 
@@ -116,6 +125,28 @@ export default function AnalysisPage() {
             {nextVisit && ` · 다음 재진 ${formatKoreanDate(nextVisit)} (${dDayLabel(daysUntil(nextVisit, today()))})`}
           </p>
         )}
+        {isCustomPeriod && (
+          <div className="-mt-1 flex items-center gap-2">
+            <input
+              type="date"
+              aria-label="시작일"
+              value={custom.startDate}
+              max={custom.endDate || today()}
+              onChange={(e) => setCustom((prev) => ({ ...prev, startDate: e.target.value }))}
+              className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 focus:border-brand-500 focus:outline-none"
+            />
+            <span className="text-gray-400">~</span>
+            <input
+              type="date"
+              aria-label="종료일"
+              value={custom.endDate}
+              min={custom.startDate}
+              max={today()}
+              onChange={(e) => setCustom((prev) => ({ ...prev, endDate: e.target.value }))}
+              className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 focus:border-brand-500 focus:outline-none"
+            />
+          </div>
+        )}
 
         <section className="rounded-3xl bg-white p-5 shadow-card">
           <div
@@ -157,6 +188,12 @@ export default function AnalysisPage() {
                 재진 사이 기록을 볼 수 있어요.
               </p>
             )
+          ) : isCustomPeriod && !range ? (
+            <p className="py-12 text-center text-gray-400">
+              시작일과 종료일을 골라 주세요.
+              <br />
+              종료일은 시작일 이후, 오늘까지 고를 수 있어요.
+            </p>
           ) : isOverlayTab ? (
             weather.loading || records.loading ? (
               <LoadingMessage />
@@ -234,7 +271,7 @@ function SegmentedControl<T extends string>({
   ariaLabel: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="grid grid-cols-3 rounded-xl bg-gray-100 p-1">
+    <div role="radiogroup" aria-label={ariaLabel} className="grid grid-cols-4 rounded-xl bg-gray-100 p-1">
       {options.map((option) => (
         <button
           key={option.value}
