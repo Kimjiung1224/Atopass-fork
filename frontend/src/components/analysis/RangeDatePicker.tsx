@@ -116,7 +116,7 @@ export default function RangeDatePicker({ value, onChange }: { value: DateRange;
                     onClick={() => pick(date)}
                     aria-pressed={isEdge}
                     aria-label={`${view.month + 1}월 ${day}일${recorded ? `, 기록 있음${scoreByDate.get(date) === null ? '' : `, ${scoreByDate.get(date)}점`}` : ''}`}
-                    className={`flex aspect-square w-full flex-col items-center justify-center gap-0.5 rounded-xl text-base ${
+                    className={`flex h-11 w-full flex-col items-center justify-center gap-0.5 rounded-xl text-base ${
                       isEdge ? 'bg-brand-600 font-bold text-white' : isFuture ? 'text-gray-300' : 'hover:bg-brand-100'
                     } ${date === todayString && !isEdge ? 'font-bold text-brand-700' : ''}`}
                   >
