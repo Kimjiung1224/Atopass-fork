@@ -4,6 +4,7 @@ import ChatChoices from '@/components/chatbot/ChatChoices';
 import ChatInput from '@/components/chatbot/ChatInput';
 import ConsentDialog from '@/components/chatbot/ConsentDialog';
 import ChatMessageList from '@/components/chatbot/ChatMessageList';
+import RecordCompleteOverlay from '@/components/chatbot/RecordCompleteOverlay';
 import PageHeader from '@/components/common/PageHeader';
 import PendingPhotoList from '@/components/record/PendingPhotoList';
 import { useChatSession } from '@/hooks/useChatSession';
@@ -32,6 +33,8 @@ export default function ChatbotPage() {
     uploadPhotos,
     agree,
     retry,
+    justCompleted,
+    dismissCompletion,
   } = useChatSession(recordDate);
   const draft = useRecordDraft(recordDate);
   const [input, setInput] = useState('');
@@ -42,6 +45,11 @@ export default function ChatbotPage() {
   const [choicesMinimized, setChoicesMinimized] = useState(false);
 
   const goToSummary = () => navigate(recordPath(recordDate));
+
+  const handleConfirmComplete = () => {
+    dismissCompletion();
+    goToSummary();
+  };
 
   // 서버가 정한 항목(askingField)을 선택지로 묻는다. 부위·증상 점수(symptoms)는 글로 답한다.
   // 첫 화면에서는 고통 지수 막대와 함께 입력창도 열어 두어, 편하게 글로 시작할 수도 있다.
@@ -151,6 +159,7 @@ export default function ChatbotPage() {
       />
 
       {status === 'consent' && <ConsentDialog onAgree={agree} onDecline={goToSummary} error={error} />}
+      {justCompleted && <RecordCompleteOverlay onConfirm={handleConfirmComplete} onContinue={dismissCompletion} />}
     </div>
   );
 }
