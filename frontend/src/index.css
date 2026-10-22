@@ -54,3 +54,15 @@ body {
     animation-duration: 1ms !important;
   }
 }
+
+/* 기록 완료 화면: 캐릭터 둘레에서 색종이 조각이 톡 튀어나오며 자리 잡는다 */
+@keyframes confetti-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
